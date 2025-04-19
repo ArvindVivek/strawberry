@@ -60,14 +60,16 @@ export default function TicketPage({
 
     const handleGenerateResponse = async () => {
         try {
-            // In a real application, this would call your API
-            const response = await fetch("/api/generate-response", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(ticket),
-            })
+            const response = await fetch(
+                "http://localhost:8000/api/generate-response",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(ticket),
+                }
+            )
 
             if (!response.ok) {
                 throw new Error("Failed to generate response")
@@ -78,7 +80,7 @@ export default function TicketPage({
             setIsEditing(true)
         } catch (error) {
             console.error("Error generating response:", error)
-            // Handle error appropriately
+            // You might want to add error handling UI here
         }
     }
 
@@ -208,7 +210,7 @@ export default function TicketPage({
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="space-y-6">
+                                    <div className="space-y-4">
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-[#FF5252]">
                                                 Subject
@@ -224,7 +226,7 @@ export default function TicketPage({
                                                             e.target.value,
                                                     })
                                                 }
-                                                className="min-h-[40px] bg-[#FFE5E5]/20 border-[#FF5252]/20 focus:border-[#FF5252]"
+                                                className="h-[20px] bg-[#FFE5E5]/20 border-[#FF5252]/20 focus:border-[#FF5252] resize-none"
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -242,7 +244,7 @@ export default function TicketPage({
                                                             e.target.value,
                                                     })
                                                 }
-                                                className="min-h-[200px] bg-[#FFE5E5]/20 border-[#FF5252]/20 focus:border-[#FF5252]"
+                                                className="h-[300px] bg-[#FFE5E5]/20 border-[#FF5252]/20 focus:border-[#FF5252] resize-none"
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -260,7 +262,7 @@ export default function TicketPage({
                                                             e.target.value,
                                                     })
                                                 }
-                                                className="min-h-[40px] bg-[#FFE5E5]/20 border-[#FF5252]/20 focus:border-[#FF5252]"
+                                                className="h-[40px] bg-[#FFE5E5]/20 border-[#FF5252]/20 focus:border-[#FF5252] resize-none"
                                             />
                                         </div>
                                         <div className="flex justify-end gap-2">
