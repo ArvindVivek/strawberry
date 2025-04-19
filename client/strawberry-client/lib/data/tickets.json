@@ -1,0 +1,124 @@
+{
+    "tickets": [
+        {
+            "customer_email_address": "sarah.johnson@example.com",
+            "ticket_title": "Flight Cancellation - Need Immediate Rebooking",
+            "ticket_summary": "Customer's flight was cancelled due to weather conditions. Needs urgent rebooking for connecting international flight.",
+            "email_subject": "URGENT: Flight #AA123 Cancelled - Need Rebooking",
+            "email_body": "Hello, my flight from JFK to LAX (AA123) was just cancelled due to weather. I have a connecting flight to Tokyo in 4 hours. This is extremely urgent as I have a business meeting tomorrow morning. Please help me get rebooked on the next available flight. My booking reference is ABC123.",
+            "sender_timestamp": "2024-04-20T08:15:00Z",
+            "priority": "HIGH",
+            "ticket_id": "TKT-2024-001",
+            "status": "OPEN",
+            "category": "FLIGHT_CANCELLATION"
+        },
+        {
+            "customer_email_address": "michael.chen@example.com",
+            "ticket_title": "Refund Request - Medical Emergency",
+            "ticket_summary": "Customer requesting refund due to medical emergency preventing travel.",
+            "email_subject": "Refund Request - Medical Documentation Attached",
+            "email_body": "I was scheduled to fly from SFO to NYC tomorrow (Flight #DL456), but I've been hospitalized due to an emergency appendectomy. I've attached my medical documentation. I need to request a full refund as I won't be able to travel for at least 2 weeks. My booking reference is XYZ789.",
+            "sender_timestamp": "2024-04-19T14:30:00Z",
+            "priority": "MEDIUM",
+            "ticket_id": "TKT-2024-002",
+            "status": "PENDING",
+            "category": "REFUND_REQUEST"
+        },
+        {
+            "customer_email_address": "emma.wilson@example.com",
+            "ticket_title": "Mobile App Not Working - Can't Check In",
+            "ticket_summary": "Customer unable to check in through mobile app, flight in 2 hours.",
+            "email_subject": "URGENT: App Not Working - Flight in 2 Hours",
+            "email_body": "I'm trying to check in for my flight from ORD to MIA (Flight #UA789) but your mobile app keeps crashing. I've tried reinstalling it but no luck. My flight is in 2 hours and I need to check in. Please help! Booking reference: DEF456",
+            "sender_timestamp": "2024-04-20T06:45:00Z",
+            "priority": "HIGH",
+            "ticket_id": "TKT-2024-003",
+            "status": "OPEN",
+            "category": "TECHNICAL_ISSUE"
+        },
+        {
+            "customer_email_address": "david.kim@example.com",
+            "ticket_title": "Lost Luggage - Connecting Flight",
+            "ticket_summary": "Customer's luggage didn't make connecting flight, contains important business documents.",
+            "email_subject": "Lost Luggage - Business Documents Inside",
+            "email_body": "I flew from LHR to JFK (Flight #BA123) and then to SFO (Flight #AA456). My luggage didn't make the connection and contains important business documents. The tracking number is LHR123456. Please help locate it urgently.",
+            "sender_timestamp": "2024-04-18T22:15:00Z",
+            "priority": "HIGH",
+            "ticket_id": "TKT-2024-004",
+            "status": "OPEN",
+            "category": "LOST_LUGGAGE"
+        },
+        {
+            "customer_email_address": "lisa.wong@example.com",
+            "ticket_title": "Special Assistance Request - Wheelchair",
+            "ticket_summary": "Customer requesting wheelchair assistance for upcoming flight.",
+            "email_subject": "Wheelchair Assistance Request - Flight #DL789",
+            "email_body": "I need wheelchair assistance for my flight from ATL to SEA (Flight #DL789) on April 25th. I've recently had knee surgery and can't walk long distances. My booking reference is GHI789. Please confirm the assistance has been arranged.",
+            "sender_timestamp": "2024-04-17T09:30:00Z",
+            "priority": "MEDIUM",
+            "ticket_id": "TKT-2024-005",
+            "status": "CLOSED",
+            "category": "SPECIAL_ASSISTANCE"
+        },
+        {
+            "customer_email_address": "robert.smith@example.com",
+            "ticket_title": "Flight Change - Business Class Upgrade",
+            "ticket_summary": "Customer requesting upgrade to business class for upcoming flight.",
+            "email_subject": "Business Class Upgrade Request - Flight #UA123",
+            "email_body": "I'm flying from DFW to LHR (Flight #UA123) next week and would like to upgrade to business class. I'm a frequent flyer (Member #123456) and have enough miles. Please let me know the upgrade options and cost.",
+            "sender_timestamp": "2024-04-16T11:20:00Z",
+            "priority": "LOW",
+            "ticket_id": "TKT-2024-006",
+            "status": "CLOSED",
+            "category": "UPGRADE_REQUEST"
+        },
+        {
+            "customer_email_address": "jennifer.martinez@example.com",
+            "ticket_title": "Flight Delay Compensation",
+            "ticket_summary": "Customer requesting compensation for significant flight delay.",
+            "email_subject": "Compensation Request - 8 Hour Delay Flight #AA789",
+            "email_body": "My flight from MIA to EWR (Flight #AA789) was delayed by 8 hours due to mechanical issues. This caused me to miss an important business meeting. I'm requesting compensation as per your policy. Booking reference: JKL123",
+            "sender_timestamp": "2024-04-15T16:45:00Z",
+            "priority": "MEDIUM",
+            "ticket_id": "TKT-2024-007",
+            "status": "PENDING",
+            "category": "COMPENSATION_REQUEST"
+        },
+        {
+            "customer_email_address": "alexander.brown@example.com",
+            "ticket_title": "Website Error - Can't Book Flight",
+            "ticket_summary": "Customer experiencing technical issues while trying to book a flight.",
+            "email_subject": "Website Error - Payment Not Processing",
+            "email_body": "I'm trying to book a flight from BOS to SFO but keep getting an error when trying to process payment. The error message says 'Payment Gateway Error'. I've tried multiple cards and browsers. Please help resolve this issue.",
+            "sender_timestamp": "2024-04-20T10:30:00Z",
+            "priority": "HIGH",
+            "ticket_id": "TKT-2024-008",
+            "status": "OPEN",
+            "category": "TECHNICAL_ISSUE"
+        },
+        {
+            "customer_email_address": "sophia.lee@example.com",
+            "ticket_title": "Pet Travel Documentation",
+            "ticket_summary": "Customer requesting information about traveling with a pet.",
+            "email_subject": "Pet Travel Requirements - Flight #DL123",
+            "email_body": "I'm planning to travel with my dog from SEA to HNL (Flight #DL123) next month. I need information about the required documentation, carrier specifications, and any additional fees. My dog is a 15lb Shih Tzu.",
+            "sender_timestamp": "2024-04-19T13:15:00Z",
+            "priority": "LOW",
+            "ticket_id": "TKT-2024-009",
+            "status": "CLOSED",
+            "category": "PET_TRAVEL"
+        },
+        {
+            "customer_email_address": "william.taylor@example.com",
+            "ticket_title": "Emergency Contact Update",
+            "ticket_summary": "Customer needs to update emergency contact information for upcoming flight.",
+            "email_subject": "URGENT: Update Emergency Contact - Flight Tomorrow",
+            "email_body": "I need to update my emergency contact information for my flight tomorrow from ORD to LAX (Flight #UA456). My previous contact is no longer available. Booking reference: MNO456",
+            "sender_timestamp": "2024-04-20T07:30:00Z",
+            "priority": "MEDIUM",
+            "ticket_id": "TKT-2024-010",
+            "status": "OPEN",
+            "category": "PROFILE_UPDATE"
+        }
+    ]
+}
