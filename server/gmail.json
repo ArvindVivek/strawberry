@@ -1,0 +1,210 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Generate a JSON object for a JIRA ticket with the following fields:\n\n\n{\n  \"customer_email\": {{ $json.From }},           // Extracted from the email header or body\n  \"ticket_title\": string,             // A brief, informative title summarizing the issue\n  \"ticket_summary\": string,           // A concise summary of the issue based on the email\n  \"email_subject\": {{ $json.Subject }},               // The original full text of the email\n  \"email_body\": string,               // The original full text of the email, just paste here without reworded\n  \"sender_timestamp\": {{ $now }},         // The timestamp from when the email was sent\n  \"priority\": \"low\" | \"medium\" | \"high\", // Determine based on urgency and severity expressed in the email\n  \"ticket_id\": int                    // A randomly generated 6-digit integer\n}\n\nPriority Classification Guide\nUse \"high\" if the email describes a major disruption (e.g., flight cancellation, lost baggage, or financial hardship).\n\nUse \"medium\" if the email mentions significant inconvenience (e.g., long delays, poor service).\n\nUse \"low\" for general feedback or non-urgent concerns.\n\nReturn only the JSON object, without any extra text or line break.\n\n",
+        "options": {
+          "systemMessage": "=You are a helpful assistant that processes customer complaint emails and generates structured JIRA tickets in JSON format. Your task is to extract and organize the necessary fields from the email content and automatically assess the priority based on the severity of the issue described.\n\n"
+        }
+      },
+      "id": "85fda04b-749f-4f73-a105-f2204ddd140e",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1540,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 👋 Welcome to n8n!\nThis example shows how to build an AI Agent that interacts with your \ncalendar.\n\n### 1. Connect your accounts\n- Claim your `free` 0 OpenAI calls in the `OpenAI model` node \n- Connect your Google account in the `Google Calendar` node credentials section\n\n### 2. Ready to test it?\nClick Chat below and start asking questions! For example you can try `What meetings do I have today?`",
+        "height": 389,
+        "width": 319,
+        "color": 6
+      },
+      "id": "bad5c0e2-fa64-4bb8-8af6-426a3a87b9ed",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        700,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "668bfd04-8757-4ade-8ad2-22242bf56b75",
+      "name": "OpenAI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        440
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "ypufMNrW86yZs5Iv",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "### Want to learn more?\nWant to learn more about AI and how to apply it best in n8n? Have a look at our [new tutorial series on YouTube](https://www.youtube.com/watch?v=yzvLfHb0nqE&lc).",
+        "height": 100,
+        "width": 317,
+        "color": 6
+      },
+      "id": "08b8c237-6923-4a2c-8cb5-56a9cb44ec11",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        700,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {}
+          ]
+        },
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        1260,
+        260
+      ],
+      "id": "97288540-5431-4d7d-806b-19153a396cc6",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "wpG3qjRMo3FpV76c",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "1f251cbb-6e51-474d-9669-ce42aef26e19",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $('Gmail Trigger').item.json.threadId }}.json",
+        "dataPropertyName": "={{ $('Gmail Trigger').item.json.id }}",
+        "options": {
+          "append": false
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        2120,
+        240
+      ],
+      "id": "eee8897d-ab81-400f-9fbe-03025bc1cadb",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "binaryPropertyName": "={{ $('Gmail Trigger').item.json.id }}",
+        "options": {
+          "format": true,
+          "fileName": "={{ $('Gmail Trigger').item.json.id }}"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1920,
+        240
+      ],
+      "id": "68327156-a943-4d70-a151-d6cb83a5dcff",
+      "name": "Convert to Json File"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "OpenAI Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Convert to Json File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        []
+      ]
+    },
+    "Convert to Json File": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "727284b3-1f90-4293-9d43-b2bed19721bc",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1c141d596687536ad32d2e8992386b5d63e2ee6ec8d6645e8687047f3f7bee11"
+  },
+  "id": "gwte7wLzj7L6f5VM",
+  "tags": []
+}
