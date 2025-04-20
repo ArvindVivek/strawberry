@@ -1,0 +1,10 @@
+{
+  "customer_email": "Arvind Vivekanandan <arvind.v@berkeley.edu>",
+  "ticket_title": "Missing/Delayed Baggage for Flight AL1013",
+  "ticket_summary": "Customer Arvind Vivekanandan reports missing or delayed baggage after flight AL1013 on July 19, 2024.",
+  "email_subject": "Missing/Delayed Baggage \u2013 Flight AL1013 on July 19, 2024",
+  "email_body": "Dear Customer Service Team,\n\nI am writing to report that my baggage was either missing or delayed following my flight AL1013 on July 19, 2024. I have not received any updates regarding its status and urgently need to know when I can expect it to be delivered.\n\nThank you for your assistance.\n\nBest regards,\nArvind Vivekanandan\narvind.v@berkeley.edu",
+  "sender_timestamp": "2025-04-19T17:27:38.627-04:00",
+  "priority": "high",
+  "ticket_id": 123456
+}

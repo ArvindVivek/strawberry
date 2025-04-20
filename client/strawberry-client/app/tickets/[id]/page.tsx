@@ -1,9 +1,10 @@
 "use client"
 
-import { ArrowLeft, Clock, Mail } from "lucide-react"
+import { ArrowLeft, Clock, Mail, Send } from "lucide-react"
 import Link from "next/link"
 import { use } from "react"
 import { useState } from "react"
+import { toast } from "sonner"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -34,7 +35,8 @@ export default function TicketPage({
     const [showOriginalEmail, setShowOriginalEmail] = useState(false)
     const [generatedResponse, setGeneratedResponse] =
         useState<GeneratedResponse | null>(null)
-    const [isEditing, setIsEditing] = useState(false)
+    const [responseText, setResponseText] = useState("")
+    const [isGenerating, setIsGenerating] = useState(false)
 
     if (!ticket) {
         notFound()
@@ -60,53 +62,67 @@ export default function TicketPage({
 
     const handleGenerateResponse = async () => {
         try {
-            const response = await fetch(
-                "http://localhost:8000/api/generate-response",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify(ticket),
-                }
-            )
+            setIsGenerating(true)
+            const response = await fetch("/api/generate-response", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    customer_email: ticket.customer_email_address,
+                    email_subject: ticket.email_subject,
+                    email_body: ticket.email_body,
+                    ticket_id: id,
+                }),
+            })
 
             if (!response.ok) {
-                throw new Error("Failed to generate response")
+                const errorData = await response.json()
+                throw new Error(
+                    errorData.detail || "Failed to generate response"
+                )
             }
 
             const data = await response.json()
             setGeneratedResponse(data)
-            setIsEditing(true)
+            setResponseText(data.email_body)
         } catch (error) {
             console.error("Error generating response:", error)
-            // You might want to add error handling UI here
+            toast.error(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to generate response"
+            )
+        } finally {
+            setIsGenerating(false)
         }
     }
 
-    const handleSendEmail = async () => {
+    const handleSendResponse = async () => {
         if (!generatedResponse) return
 
         try {
-            // In a real application, this would integrate with Gmail API
             const response = await fetch("/api/send-email", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify(generatedResponse),
+                body: JSON.stringify({
+                    ...generatedResponse,
+                    email_body: responseText,
+                }),
             })
 
             if (!response.ok) {
                 throw new Error("Failed to send email")
             }
 
-            // Handle success
-            setIsEditing(false)
+            toast.success("Email sent successfully")
             setGeneratedResponse(null)
+            setResponseText("")
         } catch (error) {
             console.error("Error sending email:", error)
-            // Handle error appropriately
+            toast.error("Failed to send email")
         }
     }
 
@@ -202,101 +218,62 @@ export default function TicketPage({
                             </CardContent>
                         </Card>
 
-                        {isEditing && generatedResponse && (
-                            <Card className="border-[#FF5252]/20">
-                                <CardHeader>
-                                    <CardTitle className="text-lg font-semibold text-[#2C1810]">
-                                        Generated Response
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-4">
+                        <div className="flex flex-col space-y-4">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-xl font-semibold text-[#2C1810]">
+                                    Response
+                                </h2>
+                                <Button
+                                    onClick={handleGenerateResponse}
+                                    disabled={isGenerating}
+                                    className="bg-[#FF5252] hover:bg-[#FF5252]/90"
+                                >
+                                    {isGenerating
+                                        ? "Generating..."
+                                        : "Generate Response"}
+                                </Button>
+                            </div>
+
+                            {generatedResponse && (
+                                <div className="space-y-4">
+                                    <div className="bg-[#FFE5E5] p-4 rounded-lg">
                                         <div className="space-y-2">
-                                            <label className="text-sm font-medium text-[#FF5252]">
+                                            <label className="text-sm font-medium text-[#2C1810]">
                                                 Subject
                                             </label>
-                                            <Textarea
-                                                value={
+                                            <p className="text-[#2C1810]">
+                                                {
                                                     generatedResponse.email_subject
                                                 }
-                                                onChange={(e) =>
-                                                    setGeneratedResponse({
-                                                        ...generatedResponse,
-                                                        email_subject:
-                                                            e.target.value,
-                                                    })
-                                                }
-                                                className="h-[20px] bg-[#FFE5E5]/20 border-[#FF5252]/20 focus:border-[#FF5252] resize-none"
-                                            />
+                                            </p>
                                         </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-[#FF8A80]">
+                                        <div className="space-y-2 mt-4">
+                                            <label className="text-sm font-medium text-[#2C1810]">
                                                 Body
                                             </label>
                                             <Textarea
-                                                value={
-                                                    generatedResponse.email_body
-                                                }
+                                                value={responseText}
                                                 onChange={(e) =>
-                                                    setGeneratedResponse({
-                                                        ...generatedResponse,
-                                                        email_body:
-                                                            e.target.value,
-                                                    })
+                                                    setResponseText(
+                                                        e.target.value
+                                                    )
                                                 }
-                                                className="h-[300px] bg-[#FFE5E5]/20 border-[#FF5252]/20 focus:border-[#FF5252] resize-none"
+                                                className="min-h-[200px] bg-white"
                                             />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-[#FFB74D]">
-                                                Recipient Email
-                                            </label>
-                                            <Textarea
-                                                value={
-                                                    generatedResponse.receipient_email_address
-                                                }
-                                                onChange={(e) =>
-                                                    setGeneratedResponse({
-                                                        ...generatedResponse,
-                                                        receipient_email_address:
-                                                            e.target.value,
-                                                    })
-                                                }
-                                                className="h-[40px] bg-[#FFE5E5]/20 border-[#FF5252]/20 focus:border-[#FF5252] resize-none"
-                                            />
-                                        </div>
-                                        <div className="flex justify-end gap-2">
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => {
-                                                    setIsEditing(false)
-                                                    setGeneratedResponse(null)
-                                                }}
-                                            >
-                                                Cancel
-                                            </Button>
-                                            <Button
-                                                className="bg-[#FF5252] hover:bg-[#FF5252]/90"
-                                                onClick={handleSendEmail}
-                                            >
-                                                Send Email
-                                            </Button>
                                         </div>
                                     </div>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {!isEditing && (
-                            <div className="flex justify-end">
-                                <Button
-                                    className="bg-[#FF5252] hover:bg-[#FF5252]/90"
-                                    onClick={handleGenerateResponse}
-                                >
-                                    Generate Response
-                                </Button>
-                            </div>
-                        )}
+                                    <div className="flex justify-end">
+                                        <Button
+                                            onClick={handleSendResponse}
+                                            className="bg-[#FF5252] hover:bg-[#FF5252]/90"
+                                        >
+                                            <Send className="h-4 w-4 mr-2" />
+                                            Send Response
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <div className="space-y-6">

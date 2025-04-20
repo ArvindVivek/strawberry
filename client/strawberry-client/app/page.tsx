@@ -11,8 +11,12 @@ import { Header } from "@/components/layout/header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { loadTickets, getTicketsByStatus } from "@/lib/data/loadTickets"
 import { Ticket } from "@/lib/types/ticket"
+import { useFileWatcher } from "@/hooks/useFileWatcher"
 
 export default function DashboardPage() {
+    // Initialize file watching
+    useFileWatcher()
+
     const tickets = loadTickets().tickets
     const openTickets = getTicketsByStatus("OPEN")
     const pendingTickets = getTicketsByStatus("PENDING")

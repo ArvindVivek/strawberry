@@ -1,0 +1,10 @@
+{
+  "customer_email": "Arvind Vivekanandan <arvind.v@berkeley.edu>",
+  "ticket_title": "Compensation Request for Flight Delay",
+  "ticket_summary": "Customer is requesting compensation for a delay experienced on Flight AL1013 on July 19, 2024.",
+  "email_subject": "Request for Compensation \u2013 Flight AL1013 Delay on July 19, 2024",
+  "email_body": "Dear Customer Service,\n\nI am writing to formally request compensation for the significant delay I experienced on Flight AL1013 on July 19, 2024. This delay caused considerable inconvenience and disrupted my travel plans.\n\nThank you for your attention to this matter.\n\nBest regards,\nArvind Vivekanandan",
+  "sender_timestamp": "2025-04-19T19:20:32.457-04:00",
+  "priority": "medium",
+  "ticket_id": 462813
+}
