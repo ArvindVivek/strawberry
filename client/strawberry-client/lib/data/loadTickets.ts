@@ -1,8 +1,12 @@
-import { TicketsData } from "../types/ticket"
+import { TicketsData, Category } from "../types/ticket"
 import ticketsData from "./tickets.json"
+import { toast } from "sonner"
+
+let lastFiles: string[] = []
+let currentTickets: TicketsData = ticketsData as TicketsData
 
 export function loadTickets(): TicketsData {
-    return ticketsData as TicketsData
+    return currentTickets
 }
 
 export function getTicketById(id: string) {
@@ -34,4 +38,53 @@ export function searchTickets(query: string) {
             ticket.ticket_summary.toLowerCase().includes(lowerQuery) ||
             ticket.customer_email_address.toLowerCase().includes(lowerQuery)
     )
+}
+
+// Function to check for new files in server/data folder
+export async function checkForNewFiles() {
+    try {
+        const baseUrl = "http://localhost:3000"
+        const response = await fetch(`${baseUrl}/api/files`)
+        if (!response.ok) {
+            throw new Error("Failed to fetch files")
+        }
+        const currentFiles = await response.json()
+        const newFiles = currentFiles.filter(
+            (file: string) => !lastFiles.includes(file)
+        )
+
+        if (newFiles.length > 0) {
+            // Load new ticket data
+            for (const file of newFiles) {
+                const fileResponse = await fetch(`${baseUrl}/api/files/${file}`)
+                if (fileResponse.ok) {
+                    const newTicket = await fileResponse.json()
+                    // Add new ticket to current tickets
+                    currentTickets.tickets.push({
+                        customer_email_address: newTicket.customer_email,
+                        ticket_title: newTicket.ticket_title,
+                        ticket_summary: newTicket.ticket_summary,
+                        email_subject: newTicket.email_subject,
+                        email_body: newTicket.email_body,
+                        sender_timestamp: newTicket.sender_timestamp,
+                        priority: newTicket.priority.toUpperCase(),
+                        ticket_id: newTicket.ticket_id.toString(),
+                        status: "OPEN",
+                        category: "OTHER" as Category,
+                        filename: file,
+                    })
+                }
+            }
+
+            toast.success(
+                `New ticket data file(s) detected: ${newFiles.join(", ")}`
+            )
+        }
+
+        lastFiles = currentFiles
+        return currentFiles
+    } catch (error) {
+        console.error("Error checking for new files:", error)
+        return []
+    }
 }

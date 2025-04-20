@@ -10,6 +10,9 @@ export type Category =
     | "COMPENSATION_REQUEST"
     | "PET_TRAVEL"
     | "PROFILE_UPDATE"
+    | "BAGGAGE_ISSUE"
+    | "BOOKING_MODIFICATION"
+    | "OTHER"
 
 export interface Ticket {
     customer_email_address: string
@@ -22,6 +25,7 @@ export interface Ticket {
     ticket_id: string
     status: Status
     category: Category
+    filename: string
 }
 
 export interface TicketsData {

@@ -2,6 +2,9 @@
 
 import { Filter, Search } from "lucide-react"
 import Link from "next/link"
+import { useState } from "react"
+import { useFileMonitor } from "@/hooks/useFileMonitor"
+import { Toaster } from "sonner"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -19,9 +22,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getTicketsByStatus, searchTickets } from "@/lib/data/loadTickets"
 import { Ticket } from "@/lib/types/ticket"
-import { useState } from "react"
 
 export default function TicketsPage() {
+    const { files, isLoading } = useFileMonitor()
     const [searchQuery, setSearchQuery] = useState("")
     const [statusFilter, setStatusFilter] = useState("ALL")
 
@@ -33,6 +36,7 @@ export default function TicketsPage() {
 
     return (
         <div className="flex min-h-screen flex-col">
+            <Toaster />
             <Header />
             <main className="flex-1 space-y-4 p-4 md:p-8">
                 <div className="flex items-center justify-between">
@@ -72,6 +76,19 @@ export default function TicketsPage() {
                     {filteredTickets.map((ticket) => (
                         <TicketCard key={ticket.ticket_id} ticket={ticket} />
                     ))}
+                </div>
+                <div className="mt-8">
+                    <h2 className="text-2xl font-bold text-[#2C1810]">
+                        Data Files
+                    </h2>
+                    <ul className="list-disc pl-5">
+                        {files.map((file) => (
+                            <li key={file.filename} className="text-[#2C1810]">
+                                {file.filename} (Last Modified:{" "}
+                                {new Date(file.last_modified).toLocaleString()})
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             </main>
         </div>
