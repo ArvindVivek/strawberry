@@ -1,0 +1,206 @@
+{
+  "app": "strawberry",
+  "baseUrl": "https://strawberry-pied.vercel.app",
+  "out": "web",
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "themeStrategy": "media",
+  "viewports": [
+    "desktop",
+    "laptop",
+    "phone"
+  ],
+  "_note": "Sample inbox only. The AI answer in 03-ai-triage is stubbed in the capture browser (routes), so capturing spends nothing.",
+  "initStorage": {
+    "strawberry:inbox:v1": {
+      "custom": [],
+      "states": {},
+      "introDismissed": true
+    }
+  },
+  "routes": [
+    {
+      "match": "**/api/triage",
+      "json": {
+        "source": "ai",
+        "triage": {
+          "category": "baggage",
+          "priority": "normal",
+          "summary": "Noah's suitcase came off the belt in Denver with a snapped wheel and a cracked shell, and he has photos.",
+          "priorityReason": "Damage has to be reported within 7 days, and he is inside that window.",
+          "citations": [
+            {
+              "clauseId": "2.5",
+              "why": "He reported the damage the day after landing and has photos, so we repair the bag or pay a fair replacement value."
+            }
+          ],
+          "reply": {
+            "subject": "Re: Suitcase arrived with a broken wheel",
+            "body": "Hi Noah,\n\nI'm sorry your suitcase arrived damaged. Because you're reporting it within 7 days of landing and you have photos, we'll either repair it or pay you a fair replacement value.\n\nPlease reply with the photos and a short description of the bag (brand, size and roughly when you bought it). We'll quote booking WT5J9C on your claim and let you know within 3 business days whether a repair or a replacement payment is the better option.\n\nLarkspur Air Support"
+          }
+        }
+      },
+      "status": 200
+    }
+  ],
+  "shots": [
+    {
+      "name": "01-inbox",
+      "path": "/",
+      "viewports": [
+        "desktop",
+        "laptop",
+        "phone"
+      ],
+      "waitFor": "text=Priya Raman",
+      "steps": [
+        {
+          "wait": 500
+        }
+      ]
+    },
+    {
+      "name": "02-lost-bag",
+      "path": "/#t-1002",
+      "viewports": [
+        "desktop",
+        "laptop"
+      ],
+      "waitFor": "text=Reporting a missing bag",
+      "steps": [
+        {
+          "wait": 400
+        }
+      ]
+    },
+    {
+      "name": "02-ticket",
+      "path": "/#t-1001",
+      "viewports": [
+        "phone"
+      ],
+      "waitFor": "text=Flight cancelled",
+      "steps": [
+        {
+          "wait": 300
+        }
+      ]
+    },
+    {
+      "name": "03-triage",
+      "path": "/#t-1001",
+      "viewports": [
+        "phone"
+      ],
+      "steps": [
+        {
+          "click": "role=tab[name=\"Triage\"]"
+        },
+        {
+          "wait": 300
+        }
+      ]
+    },
+    {
+      "name": "04-reply",
+      "path": "/#t-1001",
+      "viewports": [
+        "phone"
+      ],
+      "steps": [
+        {
+          "click": "role=tab[name=\"Reply\"]"
+        },
+        {
+          "wait": 300
+        }
+      ]
+    },
+    {
+      "name": "05-ai-triage",
+      "path": "/",
+      "viewports": [
+        "desktop",
+        "laptop"
+      ],
+      "steps": [
+        {
+          "click": "role=button[name=\"New ticket\"]"
+        },
+        {
+          "waitFor": "dialog[open]"
+        },
+        {
+          "click": "text=Fill in an example"
+        },
+        {
+          "click": "text=Add to inbox"
+        },
+        {
+          "wait": 400
+        },
+        {
+          "click": "role=button[name=\"Triage with AI\"]"
+        },
+        {
+          "waitFor": "text=Drafted by AI"
+        },
+        {
+          "wait": 400
+        }
+      ]
+    },
+    {
+      "name": "05-ai-triage",
+      "path": "/",
+      "viewports": [
+        "phone"
+      ],
+      "steps": [
+        {
+          "click": "role=button[name=\"New ticket\"]"
+        },
+        {
+          "waitFor": "dialog[open]"
+        },
+        {
+          "click": "text=Fill in an example"
+        },
+        {
+          "click": "text=Add to inbox"
+        },
+        {
+          "wait": 400
+        },
+        {
+          "click": "role=tab[name=\"Triage\"]"
+        },
+        {
+          "click": "role=button[name=\"Triage with AI\"]"
+        },
+        {
+          "waitFor": "text=Drafted by AI"
+        },
+        {
+          "wait": 400
+        }
+      ]
+    },
+    {
+      "name": "06-policy",
+      "path": "/policy",
+      "viewports": [
+        "desktop",
+        "phone"
+      ],
+      "waitFor": "text=Baggage allowance",
+      "steps": [
+        {
+          "wait": 300
+        }
+      ]
+    }
+  ]
+}
