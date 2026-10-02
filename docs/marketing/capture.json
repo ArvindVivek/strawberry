@@ -81,7 +81,7 @@
       "viewports": [
         "phone"
       ],
-      "waitFor": "text=Flight cancelled",
+      "waitFor": "h1",
       "steps": [
         {
           "wait": 300

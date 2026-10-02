@@ -1,0 +1,215 @@
+{
+  "app": "strawberry",
+  "baseUrl": "https://strawberry-pied.vercel.app",
+  "captured": "2026-10-02T22:10:07.183Z",
+  "shots": [
+    {
+      "viewport": "desktop",
+      "theme": "light",
+      "name": "01-inbox",
+      "file": "desktop-light/01-inbox.png",
+      "px": "2880x1800",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "desktop",
+      "theme": "light",
+      "name": "02-lost-bag",
+      "file": "desktop-light/02-lost-bag.png",
+      "px": "2880x1800",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "desktop",
+      "theme": "light",
+      "name": "05-ai-triage",
+      "file": "desktop-light/05-ai-triage.png",
+      "px": "2880x1800",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "desktop",
+      "theme": "light",
+      "name": "06-policy",
+      "file": "desktop-light/06-policy.png",
+      "px": "2880x1800",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "desktop",
+      "theme": "dark",
+      "name": "01-inbox",
+      "file": "desktop-dark/01-inbox.png",
+      "px": "2880x1800",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "desktop",
+      "theme": "dark",
+      "name": "02-lost-bag",
+      "file": "desktop-dark/02-lost-bag.png",
+      "px": "2880x1800",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "desktop",
+      "theme": "dark",
+      "name": "05-ai-triage",
+      "file": "desktop-dark/05-ai-triage.png",
+      "px": "2880x1800",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "desktop",
+      "theme": "dark",
+      "name": "06-policy",
+      "file": "desktop-dark/06-policy.png",
+      "px": "2880x1800",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "laptop",
+      "theme": "light",
+      "name": "01-inbox",
+      "file": "laptop-light/01-inbox.png",
+      "px": "2560x1600",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "laptop",
+      "theme": "light",
+      "name": "02-lost-bag",
+      "file": "laptop-light/02-lost-bag.png",
+      "px": "2560x1600",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "laptop",
+      "theme": "light",
+      "name": "05-ai-triage",
+      "file": "laptop-light/05-ai-triage.png",
+      "px": "2560x1600",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "laptop",
+      "theme": "dark",
+      "name": "01-inbox",
+      "file": "laptop-dark/01-inbox.png",
+      "px": "2560x1600",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "laptop",
+      "theme": "dark",
+      "name": "02-lost-bag",
+      "file": "laptop-dark/02-lost-bag.png",
+      "px": "2560x1600",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "laptop",
+      "theme": "dark",
+      "name": "05-ai-triage",
+      "file": "laptop-dark/05-ai-triage.png",
+      "px": "2560x1600",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "phone",
+      "theme": "light",
+      "name": "01-inbox",
+      "file": "phone-light/01-inbox.png",
+      "px": "1290x2796",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "phone",
+      "theme": "light",
+      "name": "02-ticket",
+      "file": "phone-light/02-ticket.png",
+      "px": "1290x2796",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "phone",
+      "theme": "light",
+      "name": "03-triage",
+      "file": "phone-light/03-triage.png",
+      "px": "1290x2796",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "phone",
+      "theme": "light",
+      "name": "04-reply",
+      "file": "phone-light/04-reply.png",
+      "px": "1290x2796",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "phone",
+      "theme": "light",
+      "name": "05-ai-triage",
+      "file": "phone-light/05-ai-triage.png",
+      "px": "1290x2796",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "phone",
+      "theme": "light",
+      "name": "06-policy",
+      "file": "phone-light/06-policy.png",
+      "px": "1290x2796",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "phone",
+      "theme": "dark",
+      "name": "01-inbox",
+      "file": "phone-dark/01-inbox.png",
+      "px": "1290x2796",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "phone",
+      "theme": "dark",
+      "name": "02-ticket",
+      "file": "phone-dark/02-ticket.png",
+      "px": "1290x2796",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "phone",
+      "theme": "dark",
+      "name": "03-triage",
+      "file": "phone-dark/03-triage.png",
+      "px": "1290x2796",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "phone",
+      "theme": "dark",
+      "name": "04-reply",
+      "file": "phone-dark/04-reply.png",
+      "px": "1290x2796",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "phone",
+      "theme": "dark",
+      "name": "05-ai-triage",
+      "file": "phone-dark/05-ai-triage.png",
+      "px": "1290x2796",
+      "consoleErrors": 0
+    },
+    {
+      "viewport": "phone",
+      "theme": "dark",
+      "name": "06-policy",
+      "file": "phone-dark/06-policy.png",
+      "px": "1290x2796",
+      "consoleErrors": 0
+    }
+  ]
+}
