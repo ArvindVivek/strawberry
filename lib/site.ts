@@ -11,7 +11,7 @@ export const site = {
   description:
     "An airline support inbox that sorts each customer email, finds the policy rules that apply and drafts a reply you can edit.",
   /** Production URL, no trailing slash. Makes share-image URLs absolute. */
-  url: "https://strawberry-kitchenlabs.vercel.app",
+  url: "https://strawberry-pied.vercel.app",
   /** Brand key: privacy and support links live at kitchenlabs-one.vercel.app/apps/<slug>/. */
   slug: "strawberry",
   /** false for private, single-owner tools: robots.ts then disallows everything. */
