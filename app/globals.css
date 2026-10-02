@@ -1,0 +1,18 @@
+@import "tailwindcss";
+/* KL Web: kit tokens (kit-owned, synced), then this app's accent (app-owned). */
+@import "../styles/kl-tokens.css";
+@import "../styles/theme.css";
+
+/* The inbox is an app shell: one viewport tall, panes scroll inside themselves. */
+html,
+body {
+  background: var(--bg);
+}
+
+/* Thin, quiet scrollbars inside panes (they appear only where a pane overflows). */
+.pane-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
