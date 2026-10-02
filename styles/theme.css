@@ -1,0 +1,16 @@
+/* Strawberry accent, from kitchenlabs-kit/brand/strawberry/palette.json. This file is yours:
+   the sync script never overwrites it. Contrast is recorded in the brand's palette-notes.md. */
+
+:root {
+  --accent: #a3195b;
+  --accent-strong: #a3195b;
+  --accent-deep: #6e1040;
+  --accent-text: #a3195b;
+  --accent-soft: #f2dfe8;
+  --on-accent: #ffffff;
+}
+
+[data-theme="dark"] {
+  --accent-text: #e5599c;
+  --accent-soft: #341a33;
+}

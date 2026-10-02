@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 1024 1024">
+  <!-- Tab icon: the full-bleed icon (assets/icon-source.svg) on a rounded tile. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#C42870"/>
+      <stop offset="1" stop-color="#7A1145"/>
+    </linearGradient>
+    <mask id="seeds">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <g fill="#000">
+        <ellipse cx="410" cy="520" rx="15" ry="24" transform="rotate(-18 410 520)"/>
+        <ellipse cx="614" cy="520" rx="15" ry="24" transform="rotate(18 614 520)"/>
+        <ellipse cx="358" cy="620" rx="15" ry="24" transform="rotate(-24 358 620)"/>
+        <ellipse cx="460" cy="610" rx="15" ry="24" transform="rotate(-8 460 610)"/>
+        <ellipse cx="564" cy="610" rx="15" ry="24" transform="rotate(8 564 610)"/>
+        <ellipse cx="666" cy="620" rx="15" ry="24" transform="rotate(24 666 620)"/>
+        <ellipse cx="420" cy="710" rx="15" ry="24" transform="rotate(-16 420 710)"/>
+        <ellipse cx="512" cy="705" rx="15" ry="24"/>
+        <ellipse cx="604" cy="710" rx="15" ry="24" transform="rotate(16 604 710)"/>
+        <ellipse cx="470" cy="795" rx="14" ry="22" transform="rotate(-10 470 795)"/>
+        <ellipse cx="554" cy="795" rx="14" ry="22" transform="rotate(10 554 795)"/>
+      </g>
+    </mask>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+  <g transform="translate(0 -40)">
+  <path mask="url(#seeds)" fill="#FFFFFF" d="M512 872 C 372 836 236 660 248 512 C 258 404 350 362 430 374 C 468 380 490 396 512 396 C 534 396 556 380 594 374 C 674 362 766 404 776 512 C 788 660 652 836 512 872 Z"/>
+  <g fill="#A8E8B2" transform="translate(512 386)">
+    <path d="M0 0 C 46 -40 118 -36 168 0 C 118 36 46 40 0 0 Z" transform="rotate(8) scale(1.0)"/>
+    <path d="M0 0 C 46 -40 118 -36 168 0 C 118 36 46 40 0 0 Z" transform="rotate(48) scale(0.82)"/>
+    <path d="M0 0 C 46 -40 118 -36 168 0 C 118 36 46 40 0 0 Z" transform="rotate(90) scale(0.7)"/>
+    <path d="M0 0 C 46 -40 118 -36 168 0 C 118 36 46 40 0 0 Z" transform="rotate(132) scale(0.82)"/>
+    <path d="M0 0 C 46 -40 118 -36 168 0 C 118 36 46 40 0 0 Z" transform="rotate(172) scale(1.0)"/>
+    <circle r="34"/>
+  </g>
+  <path d="M512 380 C 512 336 522 296 552 262" stroke="#A8E8B2" stroke-width="36" stroke-linecap="round" fill="none"/>
+  </g>
+</svg>
