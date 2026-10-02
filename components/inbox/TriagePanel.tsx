@@ -12,7 +12,7 @@ export type TriageStatus = { kind: "idle" } | { kind: "loading" } | { kind: "err
 
 const SOURCE_LINE = {
   sample: "Written ahead of time for this sample ticket.",
-  ai: "Drafted by AI from the policy rules below. Check it before you send.",
+  ai: "Drafted by AI from the policy rules above. Check it before you send.",
   rules: "Drafted by Strawberry's built-in rules, without AI. Finish the reply by hand.",
 } as const;
 

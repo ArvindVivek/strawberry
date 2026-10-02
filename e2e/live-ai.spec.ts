@@ -20,6 +20,6 @@ test("Triage with AI answers from the model, grounded in the policy", async ({ p
   expect(json.notice, JSON.stringify(json.notice)).toBeUndefined();
   expect(json.source).toBe("ai");
   expect(json.triage.citations.length).toBeGreaterThan(0);
-  await expect(page.getByText("Drafted by AI from the policy rules below. Check it before you send.")).toBeVisible();
+  await expect(page.getByText("Drafted by AI from the policy rules above. Check it before you send.")).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Reply to Noah Fischer" })).toHaveValue(/^Hi Noah/);
 });

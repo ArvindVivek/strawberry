@@ -91,6 +91,7 @@ export function InboxApp() {
             filter={filter}
             onFilter={setFilter}
             selectedId={id}
+            selectedOpen={fromHash !== null}
             onSelect={select}
             showIntro={!inbox.introDismissed}
             onDismissIntro={() => dispatch({ type: "dismissIntro" })}

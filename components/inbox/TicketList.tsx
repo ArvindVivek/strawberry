@@ -17,6 +17,7 @@ export function TicketList({
   filter,
   onFilter,
   selectedId,
+  selectedOpen,
   onSelect,
   showIntro,
   onDismissIntro,
@@ -26,6 +27,8 @@ export function TicketList({
   filter: Filter;
   onFilter: (f: Filter) => void;
   selectedId: string | null;
+  /** False when the selection is only the wide-screen default (phones show no ticket then). */
+  selectedOpen: boolean;
   onSelect: (id: string) => void;
   showIntro: boolean;
   onDismissIntro: () => void;
@@ -70,10 +73,14 @@ export function TicketList({
               <button
                 type="button"
                 onClick={() => onSelect(ticket.id)}
-                aria-current={selected ? "true" : undefined}
+                aria-current={selected && selectedOpen ? "true" : undefined}
                 className={cn(
                   "flex w-full cursor-pointer flex-col gap-1 rounded-md px-3 py-2.5 text-left transition-colors duration-75",
-                  selected ? "bg-surface ring-2 ring-accent-text" : "bg-surface/70 ring-1 ring-line hover:bg-surface",
+                  !selected
+                    ? "bg-surface/70 ring-1 ring-line hover:bg-surface"
+                    : selectedOpen
+                      ? "bg-surface ring-2 ring-accent-text"
+                      : "bg-surface/70 ring-1 ring-line hover:bg-surface md:bg-surface md:ring-2 md:ring-accent-text",
                 )}
               >
                 <span className="flex w-full items-baseline gap-2">
