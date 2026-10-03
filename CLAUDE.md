@@ -75,3 +75,11 @@ npm run screenshots         # kit capture tool → docs/marketing/web (AI answer
 - Live: deployed; `OPENAI_API_KEY` set server-side (production, preview). The org OpenAI
   balance is empty, so a real **Triage with AI** currently returns the rules draft with the
   "paused" notice; run the live check after the owner tops up.
+
+## History rewrite (2026-10-02, owner decision)
+`server/data/*.json`, `server/ticket_index/docstore.json` (a real @berkeley.edu customer address) and
+the n8n screenshot (`presentation/Screenshot 2025-04-19 at 4.50.48 PM.png`, a personal name and a
+tunnel URL) were removed from ALL history with `git filter-repo`, then main and email_agent were
+force-pushed. The current tree is byte-identical (same tree hash). Every commit hash changed: re-clone,
+don't pull. GitHub still serves the old commits by direct hash until its own cleanup; only GitHub
+Support can purge them sooner. A pre-rewrite bundle was kept outside the repo, in the lead's scratchpad.
