@@ -63,14 +63,19 @@ npm run screenshots         # kit capture tool → docs/marketing/web (AI answer
   parent or the page grows past the viewport (the e2e "fits without scrolling" test catches it).
 - **`vercel link` writes `.env.local` with a `VERCEL_OIDC_TOKEN`.** It was deleted; e2e refuses
   to run if an `OPENAI_API_KEY` ever lands there.
+- **Users never see the AI provider's or model's name (owner rule, 2026-10-02).** UI says "AI";
+  `docs/PRIVACY.md` says "a third-party AI service". `npm run leak-check` fails if `/openai|gpt-/i`
+  appears in `.next/static` or the prerendered `.next/server/app` (`*.html`, `*.rsc`, `*.body`),
+  and an e2e test checks the rendered inbox, triage panel and policy page. Server code, env names
+  and this manual may name them.
 - **Old data:** the hackathon `server/data/*.json` held a real personal email and are still in git
   history (commit `ecd346f`, also in `server/ticket_index/docstore.json`). They were removed from
   the tree on 2026-10-02; history was not rewritten (owner's call).
 
 ## Status (2026-10-02)
 
-- Gate: kit:check, typecheck, lint, vitest 156/156, build, leak-check all pass.
-- E2E: 31 passed, 3 skipped (live AI ×2, phone-only test on desktop) across phone 430×932 and
+- Gate: kit:check, typecheck, lint, vitest 156/156, build, leak-check (secrets + provider name) all pass.
+- E2E: 33 passed, 3 skipped (live AI ×2, phone-only test on desktop) across phone 430×932 and
   desktop 1280×800.
 - Live: deployed; `OPENAI_API_KEY` set server-side (production, preview). The org OpenAI
   balance is empty, so a real **Triage with AI** currently returns the rules draft with the

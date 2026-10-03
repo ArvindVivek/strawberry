@@ -15,7 +15,7 @@ First built at the Open Source AI Hackathon #16 (April 2025); `presentation/` ho
   ahead of time (`lib/samples.ts`), so the whole app works with no model at all.
 - **Your own tickets.** **New ticket** adds an email; **Triage with AI** sends it to
   `POST /api/triage`, which finds 5 candidate rules in the policy with BM25 keyword search
-  (`lib/retrieval.ts`) and asks OpenAI `gpt-5.4-mini` for a strict-schema answer that may only
+  (`lib/retrieval.ts`) and asks an AI model for a strict-schema answer that may only
   cite those rules. **Draft without AI** does the same with built-in rules, in the browser.
 - **The policy** is markdown (`content/policy.md`), split into clauses and generated into
   `lib/policy/policy.json` by `npm run policy`. `/policy` shows it.
