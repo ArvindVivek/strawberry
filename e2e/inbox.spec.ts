@@ -188,7 +188,7 @@ test("Triage with AI shows the model's draft (stubbed)", async ({ page }) => {
   await page.goto("/");
   await addExampleTicket(page);
   await showPanel(page, "Triage");
-  await expect(page.getByText(/sends this ticket's name, subject and message to OpenAI/)).toBeVisible();
+  await expect(page.getByText(/sends this ticket's name, subject and message to an AI service\. Draft without AI stays in your browser\./)).toBeVisible();
   await page.getByRole("button", { name: "Triage with AI" }).click();
   await expect(page.getByText("Drafted by AI from the policy rules above. Check it before you send.")).toBeVisible();
   await expect(page.getByText("Noah's suitcase arrived with a broken wheel and a cracked shell.")).toBeVisible();

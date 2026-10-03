@@ -78,7 +78,7 @@ export function TriagePanel({
             </div>
             {canUseAI && (
               <p className="text-[13px] text-ink-2">
-                Triage with AI sends this ticket&apos;s name, subject and message to OpenAI. Draft without AI stays in your
+                Triage with AI sends this ticket&apos;s name, subject and message to an AI service. Draft without AI stays in your
                 browser.
               </p>
             )}
@@ -149,7 +149,7 @@ export function TriagePanel({
   );
 }
 
-/** Why the AI didn't answer. "Paused" is KL Web's state for an empty OpenAI balance. */
+/** Why the AI didn't answer. "Paused" is KL Web's state for an empty AI account balance. */
 function NoticeBanner({ notice }: { notice: TriageNotice }) {
   const paused = notice.code === "paused";
   return (
