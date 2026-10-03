@@ -214,6 +214,29 @@ test("an empty OpenAI balance shows the paused state and a rules draft (stubbed)
   await expect(page.getByRole("button", { name: "Try AI again" })).toBeVisible();
 });
 
+test("no page names the AI provider or model: inbox, triage panel before and after AI, policy", async ({ page }) => {
+  // Owner rule: users only ever see "AI". page.content() includes the inline RSC payload too.
+  const PROVIDER_NAME = /openai|gpt-/i;
+  const expectClean = async () => {
+    expect(await page.locator("body").innerText()).not.toMatch(PROVIDER_NAME);
+    expect(await page.content()).not.toMatch(PROVIDER_NAME);
+  };
+  await page.route("**/api/triage", (route) => route.fulfill({ json: AI_TRIAGE }));
+  await page.goto("/");
+  await expect(page.getByText("Priya Raman").first()).toBeVisible();
+  await expectClean();
+  await addExampleTicket(page);
+  await showPanel(page, "Triage");
+  await expect(page.getByRole("button", { name: "Triage with AI" })).toBeVisible();
+  await expectClean();
+  await page.getByRole("button", { name: "Triage with AI" }).click();
+  await expect(page.getByText("Drafted by AI from the policy rules above. Check it before you send.")).toBeVisible();
+  await expectClean();
+  await page.goto("/policy");
+  await expect(page.getByText("Baggage allowance").first()).toBeVisible();
+  await expectClean();
+});
+
 test("a rate-limited request shows a plain message and keeps the ticket", async ({ page }) => {
   await page.route("**/api/triage", (route) =>
     route.fulfill({ status: 429, json: { error: { code: "rate_limited", message: "That's a lot of tries in a row. Please wait 1 minute and try again." } } }),

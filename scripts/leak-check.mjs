@@ -3,6 +3,9 @@
 // 1. Key-shaped strings: OpenAI (sk-…), Supabase secret, service_role, GitHub tokens, AWS keys.
 // 2. The real values of this app's server secrets (read from .env.local / the environment),
 //    so even an oddly shaped key is caught. Values are never printed.
+// Plus a naming check (owner rule, 2026-10-02): users never see the AI provider's or model's name,
+// so client files and the prerendered pages (.next/server/app *.html, *.rsc, *.body) must not
+// contain /openai|gpt-/i. Server code may name them; it never reaches these files.
 // Usage: node scripts/leak-check.mjs [dir]   (default .next/static)
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -34,12 +37,19 @@ for (const file of [".env.local", ".env", ".env.production.local"]) {
 }
 for (const name of SECRET_NAMES) if (process.env[name]?.length >= 12) secrets.set(name, process.env[name]);
 
-function* files(dir) {
+function* files(dir, ext = /\.(js|mjs|css|html|json|txt|map)$/) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
-    if (statSync(p).isDirectory()) yield* files(p);
-    else if (/\.(js|mjs|css|html|json|txt|map)$/.test(name)) yield p;
+    if (statSync(p).isDirectory()) yield* files(p, ext);
+    else if (ext.test(name)) yield p;
   }
+}
+
+const PROVIDER_NAME = /openai|gpt-/i;
+const PRERENDERED = ".next/server/app";
+if (!existsSync(PRERENDERED)) {
+  console.error(`leak-check: ${PRERENDERED} not found. Run npm run build first.`);
+  process.exit(1);
 }
 
 let scanned = 0;
@@ -49,10 +59,20 @@ for (const file of files(root)) {
   const text = readFileSync(file, "utf8");
   for (const [label, re] of PATTERNS) if (re.test(text)) problems.push(`${file}: looks like a ${label}`);
   for (const [name, value] of secrets) if (text.includes(value)) problems.push(`${file}: contains the value of ${name}`);
+  if (PROVIDER_NAME.test(text)) problems.push(`${file}: names the AI provider or model (${text.match(PROVIDER_NAME)[0]})`);
+}
+let pages = 0;
+for (const file of files(PRERENDERED, /\.(html|rsc|body)$/)) {
+  pages++;
+  const text = readFileSync(file, "utf8");
+  if (PROVIDER_NAME.test(text)) problems.push(`${file}: names the AI provider or model (${text.match(PROVIDER_NAME)[0]})`);
 }
 
 if (problems.length) {
   console.error(`leak-check: FAILED\n${problems.join("\n")}`);
   process.exit(1);
 }
-console.log(`leak-check: ${scanned} files in ${root}, ${PATTERNS.length} key patterns and ${secrets.size} real secret values checked, nothing found.`);
+console.log(
+  `leak-check: ${scanned} files in ${root}, ${PATTERNS.length} key patterns and ${secrets.size} real secret values checked; ` +
+    `${scanned + pages} files (${pages} prerendered in ${PRERENDERED}) free of the AI provider's name. Nothing found.`,
+);
