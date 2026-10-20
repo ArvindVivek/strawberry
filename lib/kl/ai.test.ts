@@ -1,4 +1,5 @@
-// KL Web 1.1.2, from kitchenlabs-kit/web/kl-web/lib/ai.test.ts. Kit-owned: change it in the kit, then run scripts/sync-web-kit.sh.
+// KL Web 1.1.6, from kitchenlabs-kit/web/kl-web/lib/ai.test.ts. Kit-owned: change it in the kit, then run scripts/sync-web-kit.sh.
+import { inspect } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ai.ts starts with `import "server-only"`, which throws outside a React Server environment.
@@ -306,13 +307,14 @@ describe("streaming", () => {
 const CLAUDE_URL = "https://api.anthropic.com/v1/messages";
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 
-const claudeMessage = (content: unknown[], stop_reason = "tool_use") =>
+const claudeMessage = (content: unknown[], stop_reason = "end_turn") =>
   Response.json({
     content,
     stop_reason,
     usage: { input_tokens: 100, cache_read_input_tokens: 20, cache_creation_input_tokens: 0, output_tokens: 15 },
   });
-const toolUse = (input: unknown) => ({ type: "tool_use", id: "toolu_1", name: "tip", input });
+/** A structured-output answer: the JSON arrives as text (after any thinking block). */
+const jsonAnswer = (input: unknown) => ({ type: "text", text: JSON.stringify(input) });
 
 /** A Claude SSE body (`event:` + `data:` per event), split mid-line like a real network. */
 function claudeSSE(events: Record<string, unknown>[], chunkSize = 11): Response {
@@ -328,7 +330,7 @@ function claudeSSE(events: Record<string, unknown>[], chunkSize = 11): Response 
 }
 const start = { type: "message_start", message: { usage: { input_tokens: 40, cache_read_input_tokens: 10, output_tokens: 1 } } };
 const textDelta = (text: string) => ({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text } });
-const jsonDelta = (partial_json: string) => ({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json } });
+const jsonDelta = (text: string) => ({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text } });
 const stop = (stop_reason: string) => ({ type: "message_delta", delta: { stop_reason }, usage: { output_tokens: 12 } });
 const end = { type: "message_stop" };
 
@@ -343,7 +345,7 @@ describe("Claude first", () => {
     expect(OPENAI_MODEL).toBe("gpt-5.4-mini");
   });
 
-  it("builds a Messages API body: system apart, a forced tool for JSON, thinking off on Haiku", () => {
+  it("builds a Messages API body: system apart, structured output for JSON, thinking off on Haiku", () => {
     const body = buildAnthropicBody({ system: "sys", user: "u", schema, maxOutputTokens: 200 }, false);
     expect(body).toEqual({
       model: "claude-haiku-5-5",
@@ -351,13 +353,33 @@ describe("Claude first", () => {
       system: "sys",
       messages: [{ role: "user", content: "u" }],
       thinking: { type: "disabled" },
-      tools: [{ name: "tip", description: "Give the answer by calling this tool.", input_schema: schema.schema, strict: true }],
-      tool_choice: { type: "tool", name: "tip" },
+      output_config: { format: { type: "json_schema", schema: schema.schema } },
     });
+    // No forced tool: Sonnet 5.5, Opus 5.5 and Fable 5.1 reject tool_choice "tool".
+    expect(body).not.toHaveProperty("tools");
+    expect(body).not.toHaveProperty("tool_choice");
     const text = buildAnthropicBody({ system: "s", user: "u" }, true);
-    expect(text).toMatchObject({ max_tokens: 2048, stream: true });
-    expect(text).not.toHaveProperty("tools");
-    expect(buildAnthropicBody({ system: "s", user: "u", schema: { name: "a tip!", schema: schema.schema } }, false).tool_choice).toEqual({ type: "tool", name: "a_tip_" });
+    expect(text).toEqual({ model: "claude-haiku-5-5", max_tokens: 2048, system: "s", messages: [{ role: "user", content: "u" }], thinking: { type: "disabled" }, stream: true });
+  });
+
+  it("Sonnet and Opus think: effort from reasoningEffort (none = low), room for thinking on the cap", () => {
+    const sonnet = buildAnthropicBody({ system: "s", user: "u", schema, model: "claude-sonnet-5-5", maxOutputTokens: 300 }, false);
+    expect(sonnet).not.toHaveProperty("thinking");
+    expect(sonnet).not.toHaveProperty("tool_choice");
+    expect(sonnet).toMatchObject({
+      max_tokens: 300 + 4096,
+      output_config: { effort: "low", format: { type: "json_schema", schema: schema.schema } },
+    });
+    expect(buildAnthropicBody({ system: "s", user: "u", model: "claude-opus-5-5", reasoningEffort: "high" }, true)).toMatchObject({
+      max_tokens: 2048 + 4096,
+      output_config: { effort: "high" },
+    });
+  });
+
+  it("reads a structured answer that follows a thinking block", async () => {
+    fetchMock.mockResolvedValueOnce(claudeMessage([{ type: "thinking", thinking: "", signature: "x" }, jsonAnswer({ title: "S", steps: [] })]));
+    expect(await generateJSON({ system: "s", user: "u", schema, model: "claude-sonnet-5-5" })).toEqual({ title: "S", steps: [] });
+    expect(urls()).toEqual([CLAUDE_URL]);
   });
 
   it("sends Claude a strict-mode-safe schema: unsupported constraints dropped, the rest kept", () => {
@@ -386,6 +408,33 @@ describe("Claude first", () => {
       },
     });
     expect(claudeToolSchema(schema.schema)).toEqual(schema.schema);
+  });
+
+  it("splits a nullable enum or const into anyOf, the form Claude's strict mode accepts", () => {
+    expect(claudeToolSchema({ type: ["string", "null"], enum: ["light", "dark", null], description: "theme" })).toEqual({
+      description: "theme",
+      anyOf: [{ type: "string", enum: ["light", "dark"] }, { type: "null" }],
+    });
+    // No null in the enum: null isn't allowed, so only the string branch stays.
+    expect(claudeToolSchema({ type: ["string", "null"], enum: ["a", "b"] })).toEqual({ type: "string", enum: ["a", "b"] });
+    expect(claudeToolSchema({ type: ["integer", "string", "null"], enum: [1, "x", null] })).toEqual({
+      anyOf: [{ type: "integer", enum: [1] }, { type: "string", enum: ["x"] }, { type: "null" }],
+    });
+    expect(claudeToolSchema({ type: ["string", "null"], const: "fixed" })).toEqual({ type: "string", const: "fixed" });
+    // Nested, and type unions without enum/const are left alone.
+    const nested = claudeToolSchema({
+      type: "object",
+      additionalProperties: false,
+      required: ["level", "note"],
+      properties: { level: { type: ["string", "null"], enum: ["low", null] }, note: { type: ["string", "null"] } },
+    }) as { properties: Record<string, unknown> };
+    expect(nested.properties.level).toEqual({ anyOf: [{ type: "string", enum: ["low"] }, { type: "null" }] });
+    expect(nested.properties.note).toEqual({ type: ["string", "null"] });
+    // The split schema accepts exactly what the original does.
+    const original = { type: ["string", "null"], enum: ["light", null] };
+    for (const value of ["light", null, "dark", 3]) {
+      expect(schemaMismatches(value, claudeToolSchema(original)).length === 0).toBe(schemaMismatches(value, original).length === 0);
+    }
   });
 
   it("falls back to OpenAI when Claude rejects the request (a 400 such as a schema it won't take)", async () => {
@@ -433,8 +482,8 @@ describe("Claude first", () => {
     }
   });
 
-  it("generateJSON answers from Claude's tool input, with one request and a usage line", async () => {
-    fetchMock.mockResolvedValueOnce(claudeMessage([toolUse({ title: "Stretch", steps: ["Stand up"] })]));
+  it("generateJSON answers from Claude's structured output, with one request and a usage line", async () => {
+    fetchMock.mockResolvedValueOnce(claudeMessage([jsonAnswer({ title: "Stretch", steps: ["Stand up"] })]));
     const onUsage = vi.fn();
     const out = await generateJSON({ system: "s", user: "u", schema, label: "tips", onUsage });
     expect(out).toEqual({ title: "Stretch", steps: ["Stand up"] });
@@ -451,7 +500,7 @@ describe("Claude first", () => {
     ["busy", () => new Response('{"error":{"type":"rate_limit_error"}}', { status: 429 })],
     ["overloaded", () => new Response('{"error":{"type":"overloaded_error"}}', { status: 529 })],
     ["out of credit", () => new Response('{"error":{"message":"Your credit balance is too low"}}', { status: 400 })],
-    ["no tool call", () => claudeMessage([{ type: "text", text: "Here you go" }], "end_turn")],
+    ["unreadable (not JSON)", () => claudeMessage([{ type: "text", text: "Here you go" }], "end_turn")],
   ])("falls back to OpenAI when Claude is %s", async (_, reply) => {
     fetchMock.mockResolvedValueOnce(reply()).mockResolvedValueOnce(completion('{"title":"B","steps":[]}'));
     const onUsage = vi.fn();
@@ -484,7 +533,7 @@ describe("Claude first", () => {
   it("does not fall back on a refusal, a cut-off answer or a cancel", async () => {
     fetchMock.mockResolvedValueOnce(claudeMessage([], "refusal"));
     await expect(generateJSON({ system: "s", user: "u", schema })).rejects.toMatchObject({ code: "refused" });
-    fetchMock.mockResolvedValueOnce(claudeMessage([toolUse({})], "max_tokens"));
+    fetchMock.mockResolvedValueOnce(claudeMessage([jsonAnswer({})], "max_tokens"));
     await expect(generateJSON({ system: "s", user: "u", schema })).rejects.toMatchObject({ code: "too_long" });
     const cancel = new AbortController();
     cancel.abort();
@@ -524,15 +573,15 @@ describe("Claude first", () => {
     expect(info).toHaveBeenCalledWith(expect.stringContaining("[ai] provider: anthropic label=greet model=claude-haiku-5-5 in=50 cached=10 out=12"));
   });
 
-  it("streamJSON yields the forced tool's JSON deltas, so sseResponse parses the result", async () => {
+  it("streamJSON yields Claude's structured-output deltas, so sseResponse parses the result", async () => {
     fetchMock.mockResolvedValueOnce(
       claudeSSE([
         start,
-        { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "t", name: "tip", input: {} } },
+        { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
         jsonDelta(""),
         jsonDelta('{"title":"A",'),
         jsonDelta('"steps":[]}'),
-        stop("tool_use"),
+        stop("end_turn"),
         end,
       ]),
     );
@@ -618,7 +667,7 @@ describe("answers are checked against the schema", () => {
     ["an extra key", { title: "A", steps: [], secret: "x" }],
     ["a wrong type", { title: 7, steps: [] }],
   ])("generateJSON falls back to OpenAI when Claude's answer has %s", async (_, input) => {
-    fetchMock.mockResolvedValueOnce(claudeMessage([toolUse(input)])).mockResolvedValueOnce(completion('{"title":"B","steps":[]}'));
+    fetchMock.mockResolvedValueOnce(claudeMessage([jsonAnswer(input)])).mockResolvedValueOnce(completion('{"title":"B","steps":[]}'));
     expect(await generateJSON({ system: "s", user: "u", schema })).toEqual({ title: "B", steps: [] });
     expect(urls()).toEqual([CLAUDE_URL, OPENAI_URL]);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("(bad_answer)"), expect.stringContaining("does not match schema tip"));
@@ -626,13 +675,13 @@ describe("answers are checked against the schema", () => {
 
   it("generateJSON falls back on an enum miss", async () => {
     const level = { name: "level", schema: { type: "object", additionalProperties: false, required: ["level"], properties: { level: { type: "string", enum: ["low", "high"] } } } };
-    fetchMock.mockResolvedValueOnce(claudeMessage([toolUse({ level: "medium" })])).mockResolvedValueOnce(completion('{"level":"low"}'));
+    fetchMock.mockResolvedValueOnce(claudeMessage([jsonAnswer({ level: "medium" })])).mockResolvedValueOnce(completion('{"level":"low"}'));
     expect(await generateJSON({ system: "s", user: "u", schema: level })).toEqual({ level: "low" });
     expect(urls()).toEqual([CLAUDE_URL, OPENAI_URL]);
   });
 
   it("when both answers break the schema, the result is bad_answer", async () => {
-    fetchMock.mockResolvedValueOnce(claudeMessage([toolUse({ title: "A" })])).mockResolvedValueOnce(completion('{"title":"B"}'));
+    fetchMock.mockResolvedValueOnce(claudeMessage([jsonAnswer({ title: "A" })])).mockResolvedValueOnce(completion('{"title":"B"}'));
     await expect(generateJSON({ system: "s", user: "u", schema })).rejects.toMatchObject({ code: "bad_answer" });
     vi.stubEnv("ANTHROPIC_API_KEY", "");
     fetchMock.mockResolvedValueOnce(completion('{"title":"B","steps":[],"more":1}'));
@@ -640,7 +689,7 @@ describe("answers are checked against the schema", () => {
   });
 
   it("streamJSON checks the finished answer: a mismatch ends with an error event, never a result", async () => {
-    fetchMock.mockResolvedValueOnce(claudeSSE([start, jsonDelta('{"title":"A",'), jsonDelta('"extra":1}'), stop("tool_use"), end]));
+    fetchMock.mockResolvedValueOnce(claudeSSE([start, jsonDelta('{"title":"A",'), jsonDelta('"extra":1}'), stop("end_turn"), end]));
     const events = (await sseResponse(streamJSON({ system: "s", user: "u", schema }), { json: true }).text())
       .split("\n\n")
       .filter(Boolean)
@@ -654,5 +703,133 @@ describe("answers are checked against the schema", () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "");
     fetchMock.mockResolvedValueOnce(sse([delta('{"title":"A"}'), finish("stop"), "[DONE]"]));
     await expect(collect(streamJSON({ system: "s", user: "u", schema }))).rejects.toMatchObject({ code: "bad_answer" });
+  });
+});
+
+describe("logs never hold the prompt, the answer or a key", () => {
+  // Short on purpose: JSON.parse errors quote short inputs in full, so a leak would show.
+  const PROMPT = "PRM7f3";
+  const ANSWER = "ANS9c1";
+  const req = { system: `sys ${PROMPT}`, user: `user ${PROMPT}`, images: [{ base64: `${PROMPT}AAA`, mimeType: "image/png" }], schema };
+
+  /** Everything any console method was called with, formatted the way the console prints it. */
+  function logged(): string {
+    return [info, warn, error]
+      .flatMap((spy) => spy.mock.calls.flat())
+      .map((arg: unknown) => (typeof arg === "string" ? arg : inspect(arg, { depth: 10 })))
+      .join("\n");
+  }
+  const expectClean = () => {
+    const text = logged();
+    expect(text).not.toContain(PROMPT);
+    expect(text).not.toContain(ANSWER);
+    expect(text).not.toMatch(/sk-(?!\[redacted\])[A-Za-z0-9]/);
+  };
+
+  beforeEach(() => vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant-test-not-real"));
+
+  it("success", async () => {
+    fetchMock.mockResolvedValueOnce(claudeMessage([jsonAnswer({ title: ANSWER, steps: [ANSWER] })]));
+    await generateJSON(req);
+    expect(logged()).toContain("[ai] provider: anthropic");
+    expectClean();
+  });
+
+  it("schema mismatch on both providers keeps only the paths", async () => {
+    fetchMock
+      .mockResolvedValueOnce(claudeMessage([jsonAnswer({ title: ANSWER, steps: 7, extra: ANSWER })]))
+      .mockResolvedValueOnce(completion(`{"title":7,"steps":["${ANSWER}"]}`));
+    const err = await generateJSON(req).catch((e) => e);
+    expect(err).toMatchObject({ code: "bad_answer" });
+    aiErrorResponse(err);
+    // Claude's mismatch (the more useful error) is what gets logged: paths, never values.
+    expect(logged()).toContain("$.steps: expected array; $.extra: not allowed");
+    expectClean();
+  });
+
+  it("unreadable JSON, refusal and a cut-off stream", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
+    fetchMock.mockResolvedValueOnce(completion(`${ANSWER}?`));
+    aiErrorResponse(await generateJSON(req).catch((e) => e));
+    fetchMock.mockResolvedValueOnce(completion("", { message: { content: null, refusal: `No. ${ANSWER}` } }));
+    aiErrorResponse(await generateJSON(req).catch((e) => e));
+    fetchMock.mockResolvedValueOnce(sse([JSON.stringify({ choices: [{ delta: { refusal: ANSWER }, finish_reason: "stop" }] }), "[DONE]"]));
+    await sseResponse(streamJSON(req), { json: true }).text();
+    fetchMock.mockResolvedValueOnce(sse([delta(`{"title":"${ANSWER}`), finish("stop"), "[DONE]"]));
+    await sseResponse(streamJSON(req), { json: true }).text();
+    expect(error).toHaveBeenCalled();
+    expectClean();
+  });
+
+  it("provider errors keep the type, message and request id, not the rest of the body or a key", async () => {
+    const body = JSON.stringify({ type: "error", error: { type: "invalid_request_error", message: "Incorrect API key provided: sk-proj-abcdefghijklmnop" }, echo: `${PROMPT} ${ANSWER}` });
+    fetchMock
+      .mockResolvedValueOnce(new Response(body, { status: 400, headers: { "request-id": "req_123" } }))
+      .mockResolvedValueOnce(new Response(body, { status: 500, headers: { "x-request-id": "req_456" } }));
+    const err = await generateJSON(req).catch((e) => e);
+    aiErrorResponse(err);
+    expect(logged()).toContain("400 invalid_request_error: Incorrect API key provided: sk-[redacted] request_id=req_123");
+    expect(String(errorFromStatus(500, body, "req_456").detail)).toBe(
+      "500 invalid_request_error: Incorrect API key provided: sk-[redacted] request_id=req_456",
+    );
+    fetchMock.mockResolvedValueOnce(claudeSSE([start, { type: "error", error: { type: "overloaded_error", message: "Overloaded" }, echo: ANSWER }]));
+    fetchMock.mockResolvedValueOnce(new Response(body, { status: 503 }));
+    await sseResponse(streamText(req)).text();
+    expectClean();
+  });
+});
+
+describe("provider order and the fallback model", () => {
+  beforeEach(() => vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant-test-not-real"));
+  const bodyOf = (i: number) => JSON.parse(fetchMock.mock.calls[i][1].body);
+
+  it("fallbackModel picks the OpenAI model; model still picks Claude's", async () => {
+    expect(buildBody({ system: "s", user: "u", fallbackModel: "gpt-5.4" }, false).model).toBe("gpt-5.4");
+    expect(buildBody({ system: "s", user: "u", model: "gpt-4.1-mini", fallbackModel: "gpt-5.4" }, false).model).toBe("gpt-5.4");
+    fetchMock.mockResolvedValueOnce(new Response("busy", { status: 429 })).mockResolvedValueOnce(completion('{"title":"B","steps":[]}'));
+    await generateJSON({ system: "s", user: "u", schema, model: "claude-sonnet-5-5", fallbackModel: "gpt-5.4" });
+    expect(bodyOf(0).model).toBe("claude-sonnet-5-5");
+    expect(bodyOf(1).model).toBe("gpt-5.4");
+  });
+
+  it('providers ["openai"] pins OpenAI: Claude is never called, and an OpenAI failure is final', async () => {
+    fetchMock.mockResolvedValueOnce(completion('{"title":"B","steps":[]}'));
+    expect(await generateJSON({ system: "s", user: "u", schema, providers: ["openai"], fallbackModel: "gpt-5.4" })).toEqual({ title: "B", steps: [] });
+    expect(urls()).toEqual([OPENAI_URL]);
+    expect(bodyOf(0).model).toBe("gpt-5.4");
+    fetchMock.mockResolvedValueOnce(new Response("busy", { status: 429 }));
+    await expect(generateJSON({ system: "s", user: "u", schema, providers: ["openai"] })).rejects.toMatchObject({ code: "busy" });
+    expect(urls()).toEqual([OPENAI_URL, OPENAI_URL]);
+    // No fallback, but the reason still lands in an "[ai]" line.
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("[ai] provider: openai failed (busy), no provider left"), expect.anything());
+  });
+
+  it('providers ["openai", "anthropic"] reverses the order, with the same fallback rules', async () => {
+    fetchMock.mockResolvedValueOnce(new Response("busy", { status: 429 })).mockResolvedValueOnce(claudeMessage([jsonAnswer({ title: "C", steps: [] })]));
+    expect(await generateJSON({ system: "s", user: "u", schema, providers: ["openai", "anthropic"] })).toEqual({ title: "C", steps: [] });
+    expect(urls()).toEqual([OPENAI_URL, CLAUDE_URL]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("[ai] provider: openai failed (busy), using anthropic"), expect.anything());
+  });
+
+  it('providers ["anthropic"] means no fallback, and unknown or repeated entries are ignored', async () => {
+    fetchMock.mockResolvedValueOnce(new Response("overloaded", { status: 529 }));
+    await expect(generateJSON({ system: "s", user: "u", schema, providers: ["anthropic", "anthropic"] })).rejects.toMatchObject({ code: "unavailable" });
+    expect(urls()).toEqual([CLAUDE_URL]);
+    fetchMock.mockResolvedValueOnce(claudeMessage([jsonAnswer({ title: "C", steps: [] })]));
+    await generateJSON({ system: "s", user: "u", schema, providers: ["bogus" as never] });
+    expect(urls()).toEqual([CLAUDE_URL, CLAUDE_URL]);
+  });
+
+  it("streams follow the same order", async () => {
+    fetchMock.mockResolvedValueOnce(sse([delta("Hi"), finish("stop"), "[DONE]"]));
+    expect(await collect(streamText({ system: "s", user: "u", providers: ["openai"], fallbackModel: "gpt-5.4" }))).toBe("Hi");
+    expect(urls()).toEqual([OPENAI_URL]);
+    expect(bodyOf(0).model).toBe("gpt-5.4");
+    fetchMock
+      .mockResolvedValueOnce(new Response("busy", { status: 429 }))
+      .mockResolvedValueOnce(claudeSSE([start, textDelta("Yo"), stop("end_turn"), end]));
+    expect(await collect(streamText({ system: "s", user: "u", providers: ["openai", "anthropic"] }))).toBe("Yo");
+    expect(urls()).toEqual([OPENAI_URL, OPENAI_URL, CLAUDE_URL]);
   });
 });

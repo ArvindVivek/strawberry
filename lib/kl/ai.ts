@@ -1,4 +1,4 @@
-// KL Web 1.1.2, from kitchenlabs-kit/web/kl-web/lib/ai.ts. Kit-owned: change it in the kit, then run scripts/sync-web-kit.sh.
+// KL Web 1.1.6, from kitchenlabs-kit/web/kl-web/lib/ai.ts. Kit-owned: change it in the kit, then run scripts/sync-web-kit.sh.
 // The one file in a Kitchen Labs web app that talks to a model.
 //
 // Org rule: every AI call goes to the Claude API first (ANTHROPIC_API_KEY), falls back to OpenAI
@@ -19,15 +19,21 @@ const ANTHROPIC_VERSION = "2023-06-01";
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
 /** Claude requires max_tokens. 2048 fits every answer the apps ask for; set maxOutputTokens to cap lower. */
 const CLAUDE_MAX_TOKENS = 2048;
+/** Extra max_tokens for Claude tiers that always think (Sonnet, Opus): low-effort thinking fits in
+ *  4096, so maxOutputTokens keeps meaning the answer. */
+const THINKING_HEADROOM = 4096;
 /** People wait on these calls. 20 s leaves room for a fallback inside a 30 s route budget. */
 const DEFAULT_TIMEOUT_MS = 20_000;
 /** A stream shows progress as it goes, so it may run longer than a single answer. */
 const DEFAULT_STREAM_TIMEOUT_MS = 60_000;
-/** Claude gets 60% of the time budget (12 s of the 20 s default), so the OpenAI fallback still
- *  fits inside it. */
-const CLAUDE_SHARE = 0.6;
-/** A stream that shows nothing for 12 s is stuck; switching to OpenAI beats waiting longer. */
+/** When another provider follows, the first gets 60% of the time budget (12 s of the 20 s
+ *  default), so the fallback still fits inside it. A provider tried last gets all that is left. */
+const FIRST_TRY_SHARE = 0.6;
+/** A Claude stream that shows nothing for 12 s is stuck; switching to OpenAI beats waiting longer. */
 const CLAUDE_FIRST_DELTA_MS = 12_000;
+
+export type Provider = "anthropic" | "openai";
+const DEFAULT_PROVIDERS: readonly Provider[] = ["anthropic", "openai"];
 
 /** OpenAI only (Claude ignores it). gpt-5.4-mini accepts "none" | "low" | "medium" | "high" (not "minimal"). */
 export type ReasoningEffort = "none" | "low" | "medium" | "high";
@@ -42,8 +48,15 @@ export interface TextRequest {
   imageDetail?: "low" | "high" | "auto";
   /** A "claude-…" name replaces the Claude model; any other name replaces only the OpenAI fallback. */
   model?: string;
-  /** OpenAI only. Default "none": raise only when an eval shows the lower effort fails. `null`
-   *  leaves it out (for a model without reasoning, like gpt-4.1-mini). */
+  /** The OpenAI model used when OpenAI answers. Default: `model` when it isn't a "claude-…" name,
+   *  else OPENAI_MODEL. */
+  fallbackModel?: string;
+  /** Providers to try, in order. Default ["anthropic", "openai"]. ["openai"] pins OpenAI, for a
+   *  feature where an eval shows Claude falls short; ["anthropic"] means no fallback. */
+  providers?: Provider[];
+  /** Default "none": raise only when an eval shows the lower effort fails. OpenAI gets it as
+   *  reasoning_effort (`null` leaves it out, for a model without reasoning like gpt-4.1-mini).
+   *  Claude Sonnet/Opus get it as effort ("none" counts as "low"); Haiku runs without thinking. */
   reasoningEffort?: ReasoningEffort | null;
   /** Cap it: every output token costs, and a cap turns a runaway answer into a clean error. */
   maxOutputTokens?: number;
@@ -74,6 +87,46 @@ export interface JSONRequest extends TextRequest {
 // ---------------------------------------------------------------------------------------------
 // Errors: every failure becomes an AIError with a plain-English message for people and the
 // technical detail for the console.
+//
+// Log rule: logs (and AIError.detail) never hold the prompt, user content, images, the model's
+// answer or a key. They keep the code, provider, model, HTTP status, the provider's error type and
+// message (clipped to 200 characters), the request id and schema-mismatch paths (no values).
+
+const LOG_MAX = 200;
+
+/** Clips text for a log line and blanks anything key-shaped. */
+function clip(text: string): string {
+  const clean = text.replace(/sk-[A-Za-z0-9_*.-]+/g, "sk-[redacted]").replace(/\s+/g, " ").trim();
+  return clean.length > LOG_MAX ? `${clean.slice(0, LOG_MAX)}…` : clean;
+}
+
+/** The provider's error type and message from an error body, never the rest of the body. */
+function providerError(status: number, body: string, requestId?: string | null): string {
+  let text = body;
+  try {
+    const parsed = JSON.parse(body);
+    const e = parsed?.error ?? parsed;
+    const parts = [e?.type ?? e?.code, e?.message].filter((p): p is string => typeof p === "string" && p.length > 0);
+    text = parts.length ? parts.join(": ") : "";
+  } catch {
+    // Not JSON (a gateway page): its clipped text is all there is.
+  }
+  return clip(`${status} ${text}`) + (requestId ? ` request_id=${requestId}` : "");
+}
+
+/** Reduces any detail to a short log-safe string. JSON parse errors quote the text they failed
+ *  on (the model's answer), so they are reduced to their name. */
+function logSafe(detail: unknown): string | undefined {
+  if (detail === undefined || detail === null) return undefined;
+  if (typeof detail === "string") return clip(detail);
+  const e = detail as { name?: unknown; type?: unknown; message?: unknown };
+  if (e.name === "SyntaxError") return "SyntaxError: the answer is not valid JSON";
+  if (typeof e.name === "string" && typeof e.message === "string") return clip(`${e.name}: ${e.message}`);
+  if (typeof e.type === "string" || typeof e.message === "string") {
+    return clip([e.type, e.message].filter((p) => typeof p === "string").join(": "));
+  }
+  return "[detail withheld]";
+}
 
 export type AIErrorCode =
   | "not_configured"
@@ -119,7 +172,8 @@ export class AIError extends Error {
   /** Safe to show to a person. */
   readonly userMessage: string;
   readonly status: number;
-  /** Technical detail: console only, never sent to the browser. */
+  /** Technical detail: console only, never sent to the browser. Always a short log-safe string
+   *  (see the log rule above), whatever was passed in. */
   readonly detail: unknown;
 
   constructor(code: AIErrorCode, detail?: unknown) {
@@ -128,37 +182,39 @@ export class AIError extends Error {
     this.code = code;
     this.userMessage = MESSAGES[code];
     this.status = STATUS[code];
-    this.detail = detail;
+    this.detail = logSafe(detail);
   }
 }
 
-/** Maps a non-2xx OpenAI response to an AIError. */
-export function errorFromStatus(status: number, body = ""): AIError {
-  if (status === 401 || status === 403) return new AIError("not_configured", `${status} ${body}`);
+/** Maps a non-2xx OpenAI response to an AIError. The detail keeps only the error type and message. */
+export function errorFromStatus(status: number, body = "", requestId?: string | null): AIError {
+  const detail = providerError(status, body, requestId);
+  if (status === 401 || status === 403) return new AIError("not_configured", detail);
   // 429 means two different things: a rate limit (retry soon) or an empty balance (retrying
   // can't help). Tell them apart so people aren't told to "try again in a minute".
   if (status === 429 && /insufficient_quota|credit_balance_exhausted|billing_hard_limit/.test(body)) {
     console.error("[ai] OpenAI balance is empty (insufficient_quota): AI features are paused");
-    return new AIError("paused", body);
+    return new AIError("paused", detail);
   }
-  if (status === 429) return new AIError("busy", body);
-  if (status >= 500) return new AIError("unavailable", `${status} ${body}`);
-  return new AIError("failed", `${status} ${body}`);
+  if (status === 429) return new AIError("busy", detail);
+  if (status >= 500) return new AIError("unavailable", detail);
+  return new AIError("failed", detail);
 }
 
-/** Maps a non-2xx Claude API response to an AIError. */
-export function anthropicErrorFromStatus(status: number, body = ""): AIError {
-  if (status === 401 || status === 403) return new AIError("not_configured", `${status} ${body}`);
+/** Maps a non-2xx Claude API response to an AIError. The detail keeps only the error type and message. */
+export function anthropicErrorFromStatus(status: number, body = "", requestId?: string | null): AIError {
+  const detail = providerError(status, body, requestId);
+  if (status === 401 || status === 403) return new AIError("not_configured", detail);
   // An empty credit balance comes back as a 400 (or a 402 billing_error); retrying can't help.
   if (status === 402 || (status === 400 && /credit balance/i.test(body))) {
     console.error("[ai] Claude credit balance is too low: Claude calls are paused");
-    return new AIError("paused", `${status} ${body}`);
+    return new AIError("paused", detail);
   }
-  if (status === 429) return new AIError("busy", body);
-  if (status === 413) return new AIError("too_long", `${status} ${body}`);
+  if (status === 429) return new AIError("busy", detail);
+  if (status === 413) return new AIError("too_long", detail);
   // 529 is "overloaded".
-  if (status >= 500) return new AIError("unavailable", `${status} ${body}`);
-  return new AIError("failed", `${status} ${body}`);
+  if (status >= 500) return new AIError("unavailable", detail);
+  return new AIError("failed", detail);
 }
 
 /** Turns anything thrown during an AI call into an AIError. */
@@ -246,15 +302,16 @@ function claudeModel(req: TextRequest): string {
 }
 
 function openAIModel(req: TextRequest): string {
-  return req.model && !req.model.startsWith("claude") ? req.model : OPENAI_MODEL;
+  return req.fallbackModel ?? (req.model && !req.model.startsWith("claude") ? req.model : OPENAI_MODEL);
 }
 
-/** Tool names allow letters, digits, "_" and "-", up to 64 characters. */
-function toolName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || "answer";
+/** The providers to try, in order: `req.providers` without unknowns or repeats, else the default. */
+function providerOrder(req: TextRequest): Provider[] {
+  const picked = (req.providers ?? []).filter((p): p is Provider => p === "anthropic" || p === "openai");
+  return picked.length ? [...new Set(picked)] : [...DEFAULT_PROVIDERS];
 }
 
-/** Constraints Claude's strict tool mode rejects (a 400). They are dropped from the schema sent to
+/** Constraints Claude's structured outputs reject (a 400). They are dropped from the schema sent to
  *  Claude only; apps check ranges and lengths themselves, as before. */
 const STRICT_UNSUPPORTED = new Set([
   "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf",
@@ -262,8 +319,8 @@ const STRICT_UNSUPPORTED = new Set([
 ]);
 const STRICT_FORMATS = new Set(["date-time", "time", "date", "duration", "email", "hostname", "uri", "ipv4", "ipv6", "uuid"]);
 
-/** The request schema in the form Claude's strict tool mode accepts: unsupported constraints
- *  dropped, `oneOf` as `anyOf`, `minItems` above 1 dropped. Exported for tests. */
+/** The request schema in the form Claude's structured outputs accept: unsupported constraints
+ *  dropped, `oneOf` as `anyOf`, `minItems` above 1 dropped, typed enums split. Exported for tests. */
 export function claudeToolSchema(schema: unknown): unknown {
   if (Array.isArray(schema)) return schema.map(claudeToolSchema);
   if (!schema || typeof schema !== "object") return schema;
@@ -277,12 +334,35 @@ export function claudeToolSchema(schema: unknown): unknown {
       out[key] = Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, claudeToolSchema(v)]));
     } else out[key === "oneOf" ? "anyOf" : key] = claudeToolSchema(value);
   }
-  return out;
+  return splitTypedEnum(out);
 }
 
-/** The Claude Messages API body. Exported for tests. JSON requests force one strict tool whose
- *  input schema is the request schema, so the answer arrives as the tool's input and matches it
- *  (the answer is still checked locally against the full schema). */
+/**
+ * Claude's structured outputs check every enum/const value against one declared type, so a nullable
+ * enum like `{type: ["string", "null"], enum: ["light", null]}` is a 400. Splits a type union
+ * with enum or const into one anyOf branch per type, each with only its own values; the null
+ * branch stays only when null is allowed.
+ */
+function splitTypedEnum(node: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(node.type) || node.type.length < 2 || !("enum" in node || "const" in node)) return node;
+  const { type, enum: values, const: constant, description, ...rest } = node;
+  const isConst = "const" in node;
+  const allowed = isConst ? [constant] : Array.isArray(values) ? values : [];
+  const branches = (type as unknown[]).flatMap((t): Record<string, unknown>[] => {
+    const own = allowed.filter((v) => isType(v, t));
+    if (!own.length) return [];
+    if (t === "null") return [{ type: "null" }];
+    return [isConst ? { ...rest, type: t, const: constant } : { ...rest, type: t, enum: own }];
+  });
+  if (!branches.length) return node;
+  const split = branches.length === 1 ? branches[0] : { anyOf: branches };
+  return description === undefined ? split : { description, ...split };
+}
+
+/** The Claude Messages API body. Exported for tests. JSON requests use structured outputs
+ *  (`output_config.format`), so the answer is JSON text that matches the schema; it is still
+ *  checked locally against the full schema. A forced tool would be simpler, but Sonnet 5.5,
+ *  Opus 5.5 and Fable 5.1 reject a forced tool_choice. */
 export function buildAnthropicBody(req: TextRequest | JSONRequest, stream: boolean): Record<string, unknown> {
   const model = claudeModel(req);
   const body: Record<string, unknown> = {
@@ -307,15 +387,21 @@ export function buildAnthropicBody(req: TextRequest | JSONRequest, stream: boole
       },
     ],
   };
-  // Haiku thinks before answering unless told not to. Apps size maxOutputTokens for an answer
-  // with no reasoning (OpenAI's "none"), so turn it off: faster, cheaper, and the cap still means
-  // the answer. Other tiers (Sonnet 5.5, Opus 5.5) reject "disabled", so this is Haiku only.
-  if (model.startsWith("claude-haiku")) body.thinking = { type: "disabled" };
-  if ("schema" in req) {
-    const name = toolName(req.schema.name);
-    body.tools = [{ name, description: "Give the answer by calling this tool.", input_schema: claudeToolSchema(req.schema.schema), strict: true }];
-    body.tool_choice = { type: "tool", name };
+  const outputConfig: Record<string, unknown> = {};
+  if (model.startsWith("claude-haiku")) {
+    // Haiku thinks before answering unless told not to. Apps size maxOutputTokens for an answer
+    // with no reasoning (OpenAI's "none"), so turn it off: faster, cheaper, and the cap still
+    // means the answer.
+    body.thinking = { type: "disabled" };
+  } else {
+    // Sonnet 5.5 and Opus 5.5 always think (they reject "disabled"), and thinking counts toward
+    // max_tokens. reasoningEffort sets how much ("none" counts as "low"), and the cap gets
+    // THINKING_HEADROOM on top so it still roughly means the answer. Unused tokens cost nothing.
+    outputConfig.effort = req.reasoningEffort === "medium" || req.reasoningEffort === "high" ? req.reasoningEffort : "low";
+    body.max_tokens = (req.maxOutputTokens ?? CLAUDE_MAX_TOKENS) + THINKING_HEADROOM;
   }
+  if ("schema" in req) outputConfig.format = { type: "json_schema", schema: claudeToolSchema(req.schema.schema) };
+  if (Object.keys(outputConfig).length) body.output_config = outputConfig;
   if (stream) body.stream = true;
   return body;
 }
@@ -499,7 +585,7 @@ async function post(
   headers: Record<string, string>,
   body: Record<string, unknown>,
   signal: AbortSignal,
-  mapStatus: (status: number, body: string) => AIError,
+  mapStatus: (status: number, body: string, requestId?: string | null) => AIError,
 ): Promise<Response> {
   let res: Response;
   try {
@@ -512,7 +598,10 @@ async function post(
   } catch (err) {
     throw toAIError(err);
   }
-  if (!res.ok) throw mapStatus(res.status, await res.text().catch(() => ""));
+  if (!res.ok) {
+    const requestId = res.headers.get("request-id") ?? res.headers.get("x-request-id");
+    throw mapStatus(res.status, await res.text().catch(() => ""), requestId);
+  }
   return res;
 }
 
@@ -540,14 +629,20 @@ function shouldFallBack(err: AIError, req: TextRequest): boolean {
   return FALLBACK_CODES.has(err.code) && !req.signal?.aborted;
 }
 
-function noteFallback(err: AIError): void {
-  if (err.code === "not_configured") console.warn("[ai] provider: anthropic not configured, using openai");
-  else console.warn(`[ai] provider: anthropic failed (${err.code}), using openai`, err.detail);
+/** Logged when the last provider fails, so the reason is in the "[ai]" lines even when the app
+ *  catches the error itself. */
+function noteGaveUp(provider: Provider, err: AIError): void {
+  console.warn(`[ai] provider: ${provider} failed (${err.code}), no provider left`, err.detail);
 }
 
-/** When both fail, Claude's error says more, unless Claude simply wasn't set up. */
-function moreUseful(claude: AIError, openai: AIError): AIError {
-  return claude.code === "not_configured" ? openai : claude;
+function noteFallback(from: Provider, to: Provider, err: AIError): void {
+  if (err.code === "not_configured") console.warn(`[ai] provider: ${from} not configured, using ${to}`);
+  else console.warn(`[ai] provider: ${from} failed (${err.code}), using ${to}`, err.detail);
+}
+
+/** When every provider fails, the first one's error says most, unless it simply wasn't set up. */
+function mostUseful(errors: AIError[]): AIError {
+  return errors.find((e) => e.code !== "not_configured") ?? errors[errors.length - 1];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -558,7 +653,7 @@ async function claudeJSON<T>(req: JSONRequest, timeoutMs: number): Promise<T> {
   const body = buildAnthropicBody(req, false);
   const res = await postClaude(body, signalFor(req, timeoutMs));
 
-  let data: { content?: { type?: string; input?: unknown }[]; stop_reason?: string | null; usage?: AnthropicUsage };
+  let data: { content?: { type?: string; text?: unknown }[]; stop_reason?: string | null; usage?: AnthropicUsage };
   try {
     data = await res.json();
   } catch (err) {
@@ -568,11 +663,18 @@ async function claudeJSON<T>(req: JSONRequest, timeoutMs: number): Promise<T> {
 
   if (data.stop_reason === "refusal") throw new AIError("refused", "stop_reason=refusal");
   if (data.stop_reason === "max_tokens") throw new AIError("too_long", "stop_reason=max_tokens");
-  const input = data.content?.find((block) => block.type === "tool_use")?.input;
-  if (!input || typeof input !== "object") throw new AIError("bad_answer", data);
-  checkAnswer(req, input);
+  // Thinking blocks may come first; the answer is the text.
+  const text = (data.content ?? []).map((block) => (block.type === "text" && typeof block.text === "string" ? block.text : "")).join("");
+  if (!text) throw new AIError("bad_answer", `no text in the answer (stop_reason=${data.stop_reason})`);
+  let answer: unknown;
+  try {
+    answer = JSON.parse(text);
+  } catch (err) {
+    throw new AIError("bad_answer", err);
+  }
+  checkAnswer(req, answer);
   reportClaudeUsage(req, data.usage);
-  return input as T;
+  return answer as T;
 }
 
 async function openAIJSON<T>(req: JSONRequest, timeoutMs: number): Promise<T> {
@@ -590,8 +692,8 @@ async function openAIJSON<T>(req: JSONRequest, timeoutMs: number): Promise<T> {
   reportUsage(req, data.usage);
 
   const choice = data.choices?.[0];
-  if (!choice) throw new AIError("bad_answer", data);
-  if (choice.message?.refusal) throw new AIError("refused", choice.message.refusal);
+  if (!choice) throw new AIError("bad_answer", "no choices in the answer");
+  if (choice.message?.refusal) throw new AIError("refused", "the model refused (refusal text not logged)");
   if (choice.finish_reason === "length") throw new AIError("too_long", "finish_reason=length");
   if (choice.finish_reason === "content_filter") throw new AIError("refused", "finish_reason=content_filter");
   let answer: unknown;
@@ -604,23 +706,36 @@ async function openAIJSON<T>(req: JSONRequest, timeoutMs: number): Promise<T> {
   return answer as T;
 }
 
-/** One structured-output call: Claude, then OpenAI. Returns the parsed object; throws AIError. */
+/** Time for the next provider: a share of what is left when another follows, else all of it
+ *  (at least 1 s, so a late fallback still gets a real try). */
+function budgetFor(total: number, started: number, last: boolean): number {
+  const remaining = Math.round(total - (performance.now() - started));
+  return last ? Math.max(1_000, remaining) : Math.max(1, Math.round(remaining * FIRST_TRY_SHARE));
+}
+
+/** One structured-output call: Claude, then OpenAI (or `providers`). Returns the parsed object;
+ *  throws AIError. */
 export async function generateJSON<T>(req: JSONRequest): Promise<T> {
   const problems = strictSchemaProblems(req.schema.schema);
   if (problems.length) throw new AIError("failed", `schema ${req.schema.name} is not strict: ${problems.join("; ")}`);
 
+  const order = providerOrder(req);
   const total = req.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const started = performance.now();
-  try {
-    return await claudeJSON<T>(req, Math.round(total * CLAUDE_SHARE));
-  } catch (err) {
-    const claude = toAIError(err);
-    if (!shouldFallBack(claude, req)) throw claude;
-    noteFallback(claude);
+  const errors: AIError[] = [];
+  for (let i = 0; ; i++) {
+    const last = i === order.length - 1;
+    const budget = budgetFor(total, started, last);
     try {
-      return await openAIJSON<T>(req, Math.max(1_000, Math.round(total - (performance.now() - started))));
-    } catch (err2) {
-      throw moreUseful(claude, toAIError(err2));
+      return order[i] === "anthropic" ? await claudeJSON<T>(req, budget) : await openAIJSON<T>(req, budget);
+    } catch (err) {
+      const e = toAIError(err);
+      errors.push(e);
+      if (last || !shouldFallBack(e, req)) {
+        noteGaveUp(order[i], e);
+        throw last ? mostUseful(errors) : e;
+      }
+      noteFallback(order[i], order[i + 1], e);
     }
   }
 }
@@ -671,23 +786,30 @@ async function* readSSE(
 type ClaudeEvent = {
   type?: string;
   message?: { usage?: AnthropicUsage };
-  delta?: { type?: string; text?: unknown; partial_json?: unknown; stop_reason?: string | null };
+  delta?: { type?: string; text?: unknown; stop_reason?: string | null };
   usage?: AnthropicUsage;
   error?: { type?: string; message?: string };
 };
 
-/** Claude's deltas: answer text, or the forced tool's JSON input for a JSON request. */
-async function* claudeDeltas(req: TextRequest | JSONRequest, label: string, totalMs: number): AsyncGenerator<string> {
+/** Claude's text deltas: the answer, or the JSON of a structured-output answer. */
+async function* claudeDeltas(
+  req: TextRequest | JSONRequest,
+  label: string,
+  totalMs: number,
+  fallbackFollows: boolean,
+): AsyncGenerator<string> {
   const json = "schema" in req;
   const started = performance.now();
   const body = buildAnthropicBody(req, true);
-  // Until the first delta arrives, Claude has a shorter budget, so a stuck call still leaves
-  // time for OpenAI. Once text is flowing, the whole stream budget applies.
+  // When a fallback follows, Claude has a shorter budget until the first delta arrives, so a
+  // stuck call still leaves time for it. Once text is flowing, the whole stream budget applies.
   const firstDelta = new AbortController();
-  const timer = setTimeout(
-    () => firstDelta.abort(new DOMException("no delta from Claude in time", "TimeoutError")),
-    Math.min(CLAUDE_FIRST_DELTA_MS, totalMs * CLAUDE_SHARE),
-  );
+  const timer = fallbackFollows
+    ? setTimeout(
+        () => firstDelta.abort(new DOMException("no delta from Claude in time", "TimeoutError")),
+        Math.min(CLAUDE_FIRST_DELTA_MS, totalMs * FIRST_TRY_SHARE),
+      )
+    : undefined;
   let usage: AnthropicUsage | undefined;
   let stopReason: string | null = null;
   let yielded = false;
@@ -711,9 +833,8 @@ async function* claudeDeltas(req: TextRequest | JSONRequest, label: string, tota
     }
     if (event.type === "message_stop") return { delta: null, done: true };
     if (event.type !== "content_block_delta") return { delta: null, done: false };
-    const value = json
-      ? event.delta?.type === "input_json_delta" && event.delta.partial_json
-      : event.delta?.type === "text_delta" && event.delta.text;
+    // Text and JSON answers both arrive as text deltas (JSON through structured outputs).
+    const value = event.delta?.type === "text_delta" && event.delta.text;
     return { delta: typeof value === "string" && value.length ? value : null, done: false };
   };
 
@@ -741,7 +862,7 @@ async function* claudeDeltas(req: TextRequest | JSONRequest, label: string, tota
   if (stopReason === "refusal") throw new AIError("refused", "stop_reason=refusal");
   if (stopReason === "max_tokens") throw new AIError("too_long", "stop_reason=max_tokens");
   if (!stopReason) throw new AIError("unavailable", "stream ended without stop_reason");
-  if (!yielded) throw new AIError("bad_answer", `stream had no ${json ? "tool input" : "text"}`);
+  if (!yielded) throw new AIError("bad_answer", "stream had no text");
   if (json) checkStreamedAnswer(req, text);
 }
 
@@ -789,38 +910,43 @@ async function* openAIDeltas(req: TextRequest | JSONRequest, label: string, tota
     reportUsage(req, usage);
   }
 
-  if (refusal) throw new AIError("refused", refusal);
+  if (refusal) throw new AIError("refused", "the model refused (refusal text not logged)");
   if (finishReason === "length") throw new AIError("too_long", "finish_reason=length");
   if (finishReason === "content_filter") throw new AIError("refused", "finish_reason=content_filter");
   if (!finishReason) throw new AIError("unavailable", "stream ended without finish_reason");
   if ("schema" in req) checkStreamedAnswer(req, text);
 }
 
-/** Claude's stream, or OpenAI's when Claude fails before its first delta. Once text has reached
- *  the caller there is no switching: the error is thrown after the last delta. */
+/** Claude's stream, or OpenAI's when Claude fails before its first delta (or `providers`, in
+ *  order). Once text has reached the caller there is no switching: the error is thrown after the
+ *  last delta. */
 async function* streamDeltas(req: TextRequest | JSONRequest, label: string): AsyncGenerator<string> {
+  const order = providerOrder(req);
   const total = req.timeoutMs ?? DEFAULT_STREAM_TIMEOUT_MS;
   const started = performance.now();
-  let yielded = false;
-  try {
-    for await (const delta of claudeDeltas(req, label, total)) {
-      yielded = true;
-      yield delta;
-    }
-    return;
-  } catch (err) {
-    const claude = toAIError(err);
-    if (yielded || !shouldFallBack(claude, req)) throw claude;
-    noteFallback(claude);
-    let fallbackYielded = false;
+  const errors: AIError[] = [];
+  for (let i = 0; ; i++) {
+    const last = i === order.length - 1;
+    // The whole remaining budget: a Claude stream that a fallback follows has its own
+    // first-delta deadline instead.
+    const remaining = budgetFor(total, started, true);
+    const source = order[i] === "anthropic" ? claudeDeltas(req, label, remaining, !last) : openAIDeltas(req, label, remaining);
+    let yielded = false;
     try {
-      for await (const delta of openAIDeltas(req, label, Math.max(1_000, Math.round(total - (performance.now() - started))))) {
-        fallbackYielded = true;
+      for await (const delta of source) {
+        yielded = true;
         yield delta;
       }
-    } catch (err2) {
-      const openai = toAIError(err2);
-      throw fallbackYielded ? openai : moreUseful(claude, openai);
+      return;
+    } catch (err) {
+      const e = toAIError(err);
+      if (yielded) throw e;
+      errors.push(e);
+      if (last || !shouldFallBack(e, req)) {
+        noteGaveUp(order[i], e);
+        throw last ? mostUseful(errors) : e;
+      }
+      noteFallback(order[i], order[i + 1], e);
     }
   }
 }
