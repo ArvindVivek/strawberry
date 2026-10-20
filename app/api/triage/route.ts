@@ -49,7 +49,9 @@ export async function POST(req: Request) {
       system: TRIAGE_SYSTEM,
       user: triagePrompt(input, clauses),
       schema: triageSchema(ids),
-      maxOutputTokens: 700,
+      // 1200, not 700: Claude hit 700 on a normal ticket in production (2026-10-20, stop_reason
+      // max_tokens), and a too-long answer doesn't fall back. Still a hard cap on a runaway reply.
+      maxOutputTokens: 1200,
       label: "strawberry-triage",
       signal: req.signal,
     });

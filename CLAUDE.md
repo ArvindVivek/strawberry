@@ -51,7 +51,7 @@ npm run screenshots         # kit capture tool → docs/marketing/web (AI answer
 - The one real check is `e2e/live-ai.spec.ts` (`E2E_LIVE_AI=1`, against production, 1 call,
   ~600 in / ~300 out tokens), listed in `kitchenlabs-kit/docs/operations/ai-live-checks.md`.
 - No cron, nothing scheduled. Token use per call: system ~150 tokens, ticket ≤2,000 chars,
-  5 clauses, `max_completion_tokens` 700, effort `none`.
+  5 clauses, output cap 1200 tokens (Claude needed more than 700), effort `none`.
 
 ## Gotchas (with root causes)
 

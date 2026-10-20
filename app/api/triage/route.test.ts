@@ -94,7 +94,7 @@ describe("POST /api/triage", () => {
     const sent = JSON.parse(String(init?.body));
     expect(sent.model).toBe("gpt-5.4-mini");
     expect(sent.response_format.json_schema.strict).toBe(true);
-    expect(sent.max_completion_tokens).toBe(700);
+    expect(sent.max_completion_tokens).toBe(1200);
     expect(sent.messages[1].content).toContain("Policy rules:");
     expect(sent.messages[1].content.match(/^\[\d+\.\d+\]/gm)).toHaveLength(5);
   });
