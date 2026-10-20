@@ -12,7 +12,7 @@ information.
 - There are no accounts and no database. Everything you do stays in your own browser.
 - The sample tickets and their drafted replies are written ahead of time and ship with the app.
 - Only when you press **Triage with AI** on a ticket you wrote is that ticket's text sent to a
-  third-party AI service to draft a triage and a reply.
+  third-party AI service (or, if that one is unavailable, a second one) to draft a triage and a reply.
 - No ads, no analytics, no tracking cookies.
 
 ## What we handle, and why
@@ -24,10 +24,9 @@ server unless you press **Triage with AI**. Clearing your browser's site data, o
 
 **Triage with AI.** When you press **Triage with AI** on a ticket you wrote, our server sends the
 customer name, subject and message you typed, together with the matching rules from the made-up
-airline policy, to a third-party AI service, which returns a suggested category, priority, the
+airline policy, to a third-party AI service (or, if that one is unavailable, a second one), which returns a suggested category, priority, the
 rules that apply and a draft reply. Nothing else is sent: not your other tickets, not your edits,
-not any account details (there are none). Our AI provider does not use this data to train its
-models, and may keep it for up to 30 days for abuse monitoring. Our server does not store the
+not any account details (there are none). Our AI providers do not use this data to train their models, and may keep it for up to 30 days for abuse monitoring. Our server does not store the
 ticket or the answer; it passes the answer back to your browser. **Draft without AI** never leaves
 your browser. Please don't type real people's personal details into a ticket.
 
