@@ -6,12 +6,12 @@ import { defineConfig, devices } from "@playwright/test";
 loadEnvConfig(process.cwd());
 
 // Testing never spends money (web-release-standard). The local server must run without the
-// OpenAI key, so "Triage with AI" answers with the built-in rules; specs stub /api/triage in
+// AI keys, so "Triage with AI" answers with the built-in rules; specs stub /api/triage in
 // the browser for the AI states. Only e2e/live-ai.spec.ts, with E2E_LIVE_AI=1 against the
 // deployed site, makes a real call.
 const LIVE = process.env.E2E_LIVE_AI === "1";
-if (!LIVE && !process.env.E2E_BASE_URL && process.env.OPENAI_API_KEY) {
-  throw new Error("OPENAI_API_KEY is set (e.g. in .env.local). Remove it before running e2e, so tests can't spend money.");
+if (!LIVE && !process.env.E2E_BASE_URL && (process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY)) {
+  throw new Error("ANTHROPIC_API_KEY or OPENAI_API_KEY is set (e.g. in .env.local). Remove it before running e2e, so tests can't spend money.");
 }
 
 /** E2E runs against the production build (`npm run build` first). Own port: 3194. */
@@ -42,6 +42,6 @@ export default defineConfig({
         // real keys and spend money (Overdraft, 2026-09-29). Opt in with E2E_REUSE_SERVER=1.
         reuseExistingServer: process.env.E2E_REUSE_SERVER === "1",
         timeout: 120_000,
-        env: { OPENAI_API_KEY: "" },
+        env: { ANTHROPIC_API_KEY: "", OPENAI_API_KEY: "" },
       },
 });

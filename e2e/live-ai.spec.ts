@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-// The one real OpenAI call, run once at release against the deployed site
+// The one real AI call (Claude first, OpenAI fallback), run once at release against the deployed site
 // (kitchenlabs-kit/docs/operations/ai-live-checks.md). Skipped unless E2E_LIVE_AI=1:
 //   E2E_BASE_URL=https://<prod> E2E_LIVE_AI=1 npx playwright test e2e/live-ai.spec.ts --project=desktop
-// Cost: one gpt-5.4-mini call, about 600 tokens in and 300 out.
+// Cost: one claude-haiku-5-5 call, about 600 tokens in and 300 out.
 test.skip(process.env.E2E_LIVE_AI !== "1", "real AI call: opt in with E2E_LIVE_AI=1");
 
 test("Triage with AI answers from the model, grounded in the policy", async ({ page }) => {

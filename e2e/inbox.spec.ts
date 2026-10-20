@@ -216,7 +216,7 @@ test("an empty OpenAI balance shows the paused state and a rules draft (stubbed)
 
 test("no page names the AI provider or model: inbox, triage panel before and after AI, policy", async ({ page }) => {
   // Owner rule: users only ever see "AI". page.content() includes the inline RSC payload too.
-  const PROVIDER_NAME = /openai|gpt-/i;
+  const PROVIDER_NAME = /openai|gpt-|anthropic|claude/i;
   const expectClean = async () => {
     expect(await page.locator("body").innerText()).not.toMatch(PROVIDER_NAME);
     expect(await page.content()).not.toMatch(PROVIDER_NAME);

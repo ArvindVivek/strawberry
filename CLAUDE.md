@@ -10,7 +10,7 @@ rebuilt from scratch on 2026-10-02 as one Next.js app.
   (`prj_1rrzituxN6dqmjjmL1ETsCnicnmC`, scope `arvindviveks-projects`), production
   https://strawberry-pied.vercel.app, deployed by pushing `main`.
 - **Accounts:** none. **Database:** none; the inbox lives in localStorage (`strawberry:inbox:v1`).
-- **AI:** OpenAI `gpt-5.4-mini` via `lib/kl/ai.ts`, only from `POST /api/triage`, only when
+- **AI:** Claude first (`claude-haiku-5-5`), OpenAI fallback (`gpt-5.4-mini`), via `lib/kl/ai.ts`, only from `POST /api/triage`, only when
   someone presses **Triage with AI** on a ticket they wrote. Samples never call it.
 - **Brand:** key `strawberry`, accent `#A3195B` (deep berry), palette in
   `kitchenlabs-kit/brand/strawberry/palette.json`. Icon source `assets/icon-source.svg`.
@@ -45,9 +45,9 @@ npm run screenshots         # kit capture tool → docs/marketing/web (AI answer
 
 ## Money rules
 
-- Tests never call OpenAI. Unit tests stub `fetch` (`app/api/triage/route.test.ts`);
-  `playwright.config.ts` throws if `OPENAI_API_KEY` is set locally and starts the server with it
-  empty; e2e stubs `/api/triage` in the browser for AI states.
+- Tests never call an AI provider. Unit tests stub `fetch` (`app/api/triage/route.test.ts`, which
+  blanks `ANTHROPIC_API_KEY` except in the Claude-first test); `playwright.config.ts` throws if
+  `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is set locally and starts the server with both empty; e2e stubs `/api/triage` in the browser for AI states.
 - The one real check is `e2e/live-ai.spec.ts` (`E2E_LIVE_AI=1`, against production, 1 call,
   ~600 in / ~300 out tokens), listed in `kitchenlabs-kit/docs/operations/ai-live-checks.md`.
 - No cron, nothing scheduled. Token use per call: system ~150 tokens, ticket ≤2,000 chars,
@@ -62,9 +62,9 @@ npm run screenshots         # kit capture tool → docs/marketing/web (AI answer
 - **The panes, not the page, scroll.** Any new block in the shell needs `min-h-0` on its flex
   parent or the page grows past the viewport (the e2e "fits without scrolling" test catches it).
 - **`vercel link` writes `.env.local` with a `VERCEL_OIDC_TOKEN`.** It was deleted; e2e refuses
-  to run if an `OPENAI_API_KEY` ever lands there.
+  to run if an `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` ever lands there.
 - **Users never see the AI provider's or model's name (owner rule, 2026-10-02).** UI says "AI";
-  `docs/PRIVACY.md` says "a third-party AI service". `npm run leak-check` fails if `/openai|gpt-/i`
+  `docs/PRIVACY.md` says "a third-party AI service". `npm run leak-check` fails if `/openai|gpt-|anthropic|claude/i`
   appears in `.next/static` or the prerendered `.next/server/app` (`*.html`, `*.rsc`, `*.body`),
   and an e2e test checks the rendered inbox, triage panel and policy page. Server code, env names
   and this manual may name them.
@@ -77,9 +77,8 @@ npm run screenshots         # kit capture tool → docs/marketing/web (AI answer
 - Gate: kit:check, typecheck, lint, vitest 156/156, build, leak-check (secrets + provider name) all pass.
 - E2E: 33 passed, 3 skipped (live AI ×2, phone-only test on desktop) across phone 430×932 and
   desktop 1280×800.
-- Live: deployed; `OPENAI_API_KEY` set server-side (production, preview). The org OpenAI
-  balance is empty, so a real **Triage with AI** currently returns the rules draft with the
-  "paused" notice; run the live check after the owner tops up.
+- Live: deployed; `ANTHROPIC_API_KEY` (tried first) and `OPENAI_API_KEY` (fallback) set
+  server-side (production, preview).
 
 ## History rewrite (2026-10-02, owner decision)
 `server/data/*.json`, `server/ticket_index/docstore.json` (a real @berkeley.edu customer address) and

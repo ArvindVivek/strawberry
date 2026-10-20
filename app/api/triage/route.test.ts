@@ -1,4 +1,4 @@
-// The triage route with OpenAI mocked: fetch is replaced for every test, so nothing here can
+// The triage route with the AI providers mocked: fetch is replaced for every test, so nothing here can
 // reach the network or spend money (web-release-standard: testing never spends money).
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
@@ -40,9 +40,21 @@ beforeEach(() => {
   fetchMock.mockRejectedValue(new Error("unexpected network call"));
   vi.stubGlobal("fetch", fetchMock);
   vi.stubEnv("OPENAI_API_KEY", "test-key-not-real-0000");
+  // The kit tries Claude first; tests blank its key to pin the OpenAI path unless they set it.
+  vi.stubEnv("ANTHROPIC_API_KEY", "");
   vi.spyOn(console, "info").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
+function claudeAnswer(input: object) {
+  return new Response(
+    JSON.stringify({
+      content: [{ type: "tool_use", input }],
+      stop_reason: "tool_use",
+      usage: { input_tokens: 600, output_tokens: 250 },
+    }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
+}
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -60,10 +72,7 @@ describe("POST /api/triage", () => {
         priority: "urgent",
         summary: "Stuck overnight after a delay caused by an aircraft fault.",
         priority_reason: "Stranded tonight.",
-        citations: [
-          { clause_id: allowed[0], why: "First rule." },
-          { clause_id: "42.1", why: "Invented." },
-        ],
+        citations: [{ clause_id: allowed[0], why: "First rule." }],
         reply_subject: "Re: stuck in Chicago",
         reply_body: "Hi Mei,\n\nWe'll book you a hotel tonight.\n\nLarkspur Air Support",
       });
@@ -75,7 +84,7 @@ describe("POST /api/triage", () => {
     expect(json.source).toBe("ai");
     expect(json.notice).toBeUndefined();
     expect(json.triage.priority).toBe("urgent");
-    expect(json.triage.citations).toHaveLength(1); // "42.1" was dropped
+    expect(json.triage.citations).toHaveLength(1);
     expect(json.triage.reply.body).toContain("Hi Mei");
 
     // One call, to OpenAI, with the default model, a strict schema and the candidate rules only.
@@ -108,6 +117,51 @@ describe("POST /api/triage", () => {
     const json = (await (await call(ticket)).json()) as TriageResponse;
     expect(json.source).toBe("rules");
     expect(json.notice?.code).toBe("busy");
+  });
+
+  // KL Web 1.1 checks every answer against the schema, so a rule the model wasn't sent (outside
+  // the clause_id enum) fails the whole answer and the visitor gets the rules draft.
+  it("falls back to the rules when the model cites a rule it wasn't sent", async () => {
+    fetchMock.mockResolvedValue(
+      openAIAnswer({
+        category: "delay",
+        priority: "urgent",
+        summary: "Stuck overnight.",
+        priority_reason: "Stranded tonight.",
+        citations: [{ clause_id: "42.1", why: "Invented." }],
+        reply_subject: "Re: stuck in Chicago",
+        reply_body: "Hi Mei",
+      }),
+    );
+    const json = (await (await call(ticket)).json()) as TriageResponse;
+    expect(json.source).toBe("rules");
+    expect(json.triage.citations.map((c) => c.clauseId)).not.toContain("42.1");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks Claude first when its key is set", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-key-not-real-1111");
+    fetchMock.mockImplementation(async (_url, init) => {
+      const sent = JSON.parse(String(init?.body));
+      const allowed: string[] = sent.tools[0].input_schema.properties.citations.items.properties.clause_id.enum;
+      return claudeAnswer({
+        category: "delay",
+        priority: "urgent",
+        summary: "Stuck overnight after a delay caused by an aircraft fault.",
+        priority_reason: "Stranded tonight.",
+        citations: [{ clause_id: allowed[0], why: "First rule." }],
+        reply_subject: "Re: stuck in Chicago",
+        reply_body: "Hi Mei,\n\nWe'll book you a hotel tonight.\n\nLarkspur Air Support",
+      });
+    });
+
+    const json = (await (await call(ticket)).json()) as TriageResponse;
+    expect(json.source).toBe("ai");
+    expect(json.triage.citations).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe("https://api.anthropic.com/v1/messages");
+    expect(JSON.parse(String(init?.body)).model).toBe("claude-haiku-5-5");
   });
 
   it("answers with the rules, without calling anyone, when no key is set", async () => {

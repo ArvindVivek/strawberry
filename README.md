@@ -30,5 +30,5 @@ npm run gate           # kit check, typecheck, lint, unit tests, build, leak che
 npm run build && npm run e2e
 ```
 
-Without `OPENAI_API_KEY`, **Triage with AI** answers with the built-in rules and says AI triage is
+Without `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` (Claude is tried first), **Triage with AI** answers with the built-in rules and says AI triage is
 off; that's how tests run. See `CLAUDE.md` for the operating manual.

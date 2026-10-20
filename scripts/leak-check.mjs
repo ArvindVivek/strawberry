@@ -5,7 +5,7 @@
 //    so even an oddly shaped key is caught. Values are never printed.
 // Plus a naming check (owner rule, 2026-10-02): users never see the AI provider's or model's name,
 // so client files and the prerendered pages (.next/server/app *.html, *.rsc, *.body) must not
-// contain /openai|gpt-/i. Server code may name them; it never reaches these files.
+// contain /openai|gpt-|anthropic|claude/i. Server code may name them; it never reaches these files.
 // Usage: node scripts/leak-check.mjs [dir]   (default .next/static)
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -26,7 +26,7 @@ const PATTERNS = [
 ];
 
 // Add any other server-only env var this app uses.
-const SECRET_NAMES = ["OPENAI_API_KEY", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY", "GITHUB_TOKEN"];
+const SECRET_NAMES = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY", "GITHUB_TOKEN"];
 const secrets = new Map();
 for (const file of [".env.local", ".env", ".env.production.local"]) {
   if (!existsSync(file)) continue;
@@ -45,7 +45,7 @@ function* files(dir, ext = /\.(js|mjs|css|html|json|txt|map)$/) {
   }
 }
 
-const PROVIDER_NAME = /openai|gpt-/i;
+const PROVIDER_NAME = /openai|gpt-|anthropic|claude/i;
 const PRERENDERED = ".next/server/app";
 if (!existsSync(PRERENDERED)) {
   console.error(`leak-check: ${PRERENDERED} not found. Run npm run build first.`);
