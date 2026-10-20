@@ -52,6 +52,9 @@ export async function POST(req: Request) {
       // 1200, not 700: Claude hit 700 on a normal ticket in production (2026-10-20, stop_reason
       // max_tokens), and a too-long answer doesn't fall back. Still a hard cap on a runaway reply.
       maxOutputTokens: 1200,
+      // 25 s, not the kit's 20 s: Claude gets 60% (15 s) and its triage took 10.5 s live; the
+      // OpenAI fallback still fits inside maxDuration 30.
+      timeoutMs: 25_000,
       label: "strawberry-triage",
       signal: req.signal,
     });

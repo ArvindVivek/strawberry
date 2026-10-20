@@ -45,11 +45,12 @@ beforeEach(() => {
   vi.spyOn(console, "info").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
-function claudeAnswer(input: object) {
+/** Claude answers JSON as a text block (structured outputs, KL Web 1.1.6). */
+function claudeAnswer(answer: object) {
   return new Response(
     JSON.stringify({
-      content: [{ type: "tool_use", input }],
-      stop_reason: "tool_use",
+      content: [{ type: "text", text: JSON.stringify(answer) }],
+      stop_reason: "end_turn",
       usage: { input_tokens: 600, output_tokens: 250 },
     }),
     { status: 200, headers: { "content-type": "application/json" } },
@@ -143,7 +144,7 @@ describe("POST /api/triage", () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "test-key-not-real-1111");
     fetchMock.mockImplementation(async (_url, init) => {
       const sent = JSON.parse(String(init?.body));
-      const allowed: string[] = sent.tools[0].input_schema.properties.citations.items.properties.clause_id.enum;
+      const allowed: string[] = sent.output_config.format.schema.properties.citations.items.properties.clause_id.enum;
       return claudeAnswer({
         category: "delay",
         priority: "urgent",
